@@ -468,11 +468,13 @@ async function viewStaffQueue() {
     const typeInput = el('input', { id: 'f-type', type: 'number', min: '1', placeholder: 'Type ID', value: params.get('document_type_id') || '' });
     const fromInput = el('input', { id: 'f-from', type: 'date', value: params.get('date_from') || '' });
     const toInput = el('input', { id: 'f-to', type: 'date', value: params.get('date_to') || '' });
+    const fromField = el('label', { class: 'filter-field' }, el('span', { class: 'filter-label', text: 'From' }), fromInput);
+    const toField = el('label', { class: 'filter-field' }, el('span', { class: 'filter-label', text: 'To' }), toInput);
 
     app.replaceChildren(
         el('h1', { text: 'Request queue' }),
         el('div', { class: 'card filters' },
-            statusSelect, searchInput, typeInput, fromInput, toInput,
+            statusSelect, searchInput, typeInput, fromField, toField,
             el('button', { class: 'wide', text: 'Apply filters', onclick: viewStaffQueue }),
         ),
         el('div', { class: 'card' },
@@ -591,9 +593,9 @@ async function viewNotifications() {
         return;
     }
 
-    const items = result.data.items.map((n) => el('li', { class: 'timeline' },
-        el('div', {}, el('strong', { text: n.subject }), n.read_at ? null : el('span', { class: 'badge', text: 'new' })),
-        el('div', { text: n.body }),
+    const items = result.data.items.map((n) => el('li', { class: 'notif-item' },
+        el('div', { class: 'notif-head' }, el('strong', { text: n.subject }), n.read_at ? null : el('span', { class: 'badge badge-new', text: 'new' })),
+        el('div', { class: 'notif-body', text: n.body }),
         el('div', { class: 'when', text: fmtDateTime(n.created_at) }),
         n.read_at ? null : el('button', {
             class: 'secondary',
@@ -609,7 +611,7 @@ async function viewNotifications() {
         el('h1', { text: 'Notifications' }),
         el('div', { class: 'card' },
             el('p', { class: 'muted', text: `${result.data.meta.unread} unread.` }),
-            items.length === 0 ? el('p', { class: 'muted', text: 'No notifications yet.' }) : el('ul', { class: 'timeline' }, items),
+            items.length === 0 ? el('p', { class: 'muted', text: 'No notifications yet.' }) : el('ul', { class: 'notif-list' }, items),
         ),
     );
 }

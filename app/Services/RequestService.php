@@ -137,7 +137,7 @@ final class RequestService
                 $requestId,
                 "REGIS-TRACK: $trackingNumber",
                 sprintf(
-                    'New request RT %s: %s (x%d) from %s is pending review.',
+                    'New request %s: %s (x%d) from %s is pending review.',
                     $trackingNumber,
                     (string) $documentType['name'],
                     $quantity,
