@@ -135,7 +135,8 @@ function renderNavbar() {
     navbar.classList.remove('hidden');
 
     const home = state.user.role === 'student' ? '#/student' : '#/staff';
-    const links = [el('a', { href: home, class: 'brand', text: 'REGIS-TRACK' })];
+    const brandIcon = el('img', { src: '/assets/icon-128.png', alt: '', class: 'brand-icon' });
+    const links = [el('a', { href: home, class: 'brand' }, brandIcon, 'REGIS-TRACK')];
 
     if (state.user.role === 'student') {
         links.push(el('a', { href: '#/student', text: 'My Requests' }));
@@ -220,6 +221,7 @@ function viewLogin(errorText, fieldErrors = {}) {
     );
 
     app.append(el('div', { class: 'login-box card' },
+        el('img', { src: '/assets/icon-128.png', alt: 'REGIS-TRACK logo', class: 'login-logo' }),
         el('h1', { text: 'REGIS-TRACK' }),
         el('p', { class: 'muted', text: 'Log in with your institutional credentials.' }),
         errorText ? messageBox('form-error', errorText) : null,

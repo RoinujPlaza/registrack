@@ -39,7 +39,15 @@ body {
     padding: 0.6rem 1rem;
     flex-wrap: wrap;
 }
-.navbar .brand { font-weight: 700; letter-spacing: 0.5px; }
+.navbar .brand {
+    display: inline-flex; align-items: center; gap: 0.45rem;
+    font-weight: 700; letter-spacing: 0.5px;
+}
+.brand-icon {
+    width: 26px; height: 26px;
+    background: #fff; border-radius: 6px; padding: 3px;
+    display: inline-block;
+}
 .navbar a { color: #eaf5f0; text-decoration: none; padding: 0.35rem 0.6rem; border-radius: 6px; }
 .navbar a:hover, .navbar a.active { background: var(--green-dark); }
 .navbar .spacer { flex: 1; }
@@ -151,8 +159,14 @@ tr.clickable:hover { background: #f2f7f4; }
 }
 
 /* Login */
-.login-box { max-width: 380px; margin: 3rem auto; }
+.login-box { max-width: 380px; margin: 3rem auto; text-align: center; }
 .login-box h1 { text-align: center; color: var(--green-dark); }
+.login-logo {
+    width: 64px; height: 64px;
+    display: block; margin: 0 auto 0.6rem;
+    background: #eef2f0; border-radius: 14px; padding: 8px;
+}
+.login-box form { text-align: left; }
 
 /* Reports */
 .report-grid { display: grid; gap: 1rem; grid-template-columns: 1fr; }

@@ -74,6 +74,11 @@ The SPA (public/index.html + assets) talks to the same PHP API; hash routes:
 For Apache serving, point a vhost `DocumentRoot` at `registrack/public`
 (a root `.htaccess` fallback redirects into `public/` if serving from the project root).
 
+## Credits
+
+- App icon: ["Checklist" by Magnific](https://www.flaticon.com/free-icon/checklist_2666469) via
+  [Flaticon](https://www.flaticon.com) — free license with attribution.
+
 ## Security notes
 
 - The application user in production is created by `database/grants.sql` and has
