@@ -58,6 +58,12 @@ function el(tag, attrs = {}, ...children) {
     return node;
 }
 
+/* Null-safe replaceChildren: the DOM method stringifies null into literal
+ * "null" text, so conditional nodes must be filtered before passing. */
+function setChildren(parent, ...children) {
+    parent.replaceChildren(...children.flat(Infinity).filter((c) => c != null && c !== false));
+}
+
 /* --- API client --------------------------------------------------------- */
 async function api(path, { method = 'GET', body, headers = {} } = {}) {
     const options = {
@@ -204,7 +210,7 @@ function viewLogin(errorText, fieldErrors = {}) {
                 await refreshUnread();
                 location.hash = state.user.role === 'student' ? '#/student' : '#/staff';
             } catch (err) {
-                errorSlot.replaceChildren(messageBox('form-error', err.message), fieldError(err.fields, 'email'), fieldError(err.fields, 'password'));
+                setChildren(errorSlot, messageBox('form-error', err.message), fieldError(err.fields, 'email'), fieldError(err.fields, 'password'));
             }
         },
     },
@@ -256,7 +262,7 @@ async function viewStudentHome() {
         list.data.items.length === 0 ? el('p', { class: 'muted', text: 'No requests on record yet. Submit your first request above.' }) : null,
     );
 
-    app.replaceChildren(el('h1', { text: `Welcome, ${state.user.full_name}` }), flashBox, formCard, listCard);
+    setChildren(app, el('h1', { text: `Welcome, ${state.user.full_name}` }), flashBox, formCard, listCard);
 }
 
 function requestsTable(items, { trackingHref, staffHref, showStudent = false }) {
@@ -322,7 +328,8 @@ function requestFormCard(documentTypes, onSubmitted) {
                 purposeInput.value = '';
                 onSubmitted();
             } catch (err) {
-                errorSlot.replaceChildren(
+                setChildren(
+                    errorSlot,
                     messageBox('form-error', err.message),
                     ...Object.entries(err.fields || {}).map(([field, msg]) => fieldError({ [field]: msg }, field)),
                 );
@@ -376,7 +383,7 @@ async function viewStudentRequest(trackingNumber) {
         },
     });
 
-    app.replaceChildren(
+    setChildren(app,
         el('p', {}, el('a', { href: '#/student', text: '← Back to my requests' })),
         el('div', { class: 'card' },
             el('h1', { text: request.tracking_number }, ' ', statusBadge(request.status)),
@@ -468,11 +475,11 @@ async function viewStaffRequest(requestId) {
             onclick: () => renderTransitionForm(actionSlot, request, to, reasonRequired),
         }));
 
-    app.replaceChildren(
+    setChildren(app,
         el('p', {}, el('a', { href: '#/staff', text: '← Back to queue' })),
         el('div', { class: 'card' },
             el('h1', { text: request.tracking_number }, ' ', statusBadge(request.status)),
-            el('p', {}, el('strong', { text: request.student_name }), ` (${request.student_number || 'staff account'})`),
+            el('p', {}, el('strong', { text: request.student_name }), ` (${request.student_number || 'no student number'})`),
             el('p', {}, el('strong', { text: request.document_type_name }), ` × ${request.quantity}`),
             el('p', { text: `Purpose: ${request.purpose}` }),
             el('p', { class: 'muted', text: `Submitted ${fmtDateTime(request.submitted_at)} · Target release ${fmtDate(request.target_release_date)}` }),
@@ -630,7 +637,8 @@ async function viewAdminUsers(formState = {}) {
                 });
                 viewAdminUsers();
             } catch (err) {
-                errorSlot.replaceChildren(
+                setChildren(
+                    errorSlot,
                     messageBox('form-error', err.message),
                     ...Object.entries(err.fields || {}).map(([field, msg]) => fieldError({ [field]: msg }, field)),
                 );
