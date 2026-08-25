@@ -439,8 +439,9 @@ function historyCard(history) {
 /* --- Views: staff ----------------------------------------------------------- */
 async function viewStaffQueue() {
     const app = document.getElementById('app');
-    app.replaceChildren(el('p', { class: 'muted', text: 'Loading…' }));
 
+    // Read filter values BEFORE clearing the app container: the filter inputs
+    // live inside #app, so wiping first would destroy them (and lose the query).
     const params = new URLSearchParams();
     for (const [id, key] of [['f-status', 'status'], ['f-q', 'q'], ['f-type', 'document_type_id'], ['f-from', 'date_from'], ['f-to', 'date_to']]) {
         const value = document.getElementById(id)?.value?.trim();
@@ -448,6 +449,8 @@ async function viewStaffQueue() {
     }
     params.set('page', '1');
     params.set('page_size', '20');
+
+    app.replaceChildren(el('p', { class: 'muted', text: 'Loading…' }));
 
     let result;
     try {
@@ -469,7 +472,7 @@ async function viewStaffQueue() {
     app.replaceChildren(
         el('h1', { text: 'Request queue' }),
         el('div', { class: 'card filters' },
-            statusSelect, searchInput, typeInput, fromInput,
+            statusSelect, searchInput, typeInput, fromInput, toInput,
             el('button', { class: 'wide', text: 'Apply filters', onclick: viewStaffQueue }),
         ),
         el('div', { class: 'card' },
