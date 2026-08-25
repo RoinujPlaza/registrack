@@ -128,6 +128,30 @@ function fieldError(errors, name) {
     return errors && errors[name] ? el('p', { class: 'field-error', text: errors[name] }) : null;
 }
 
+/* Inline stroke icons (Feather-style, 24x24) for the navbar. */
+const NAV_ICONS = {
+    requests: '<path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="8" y1="16" x2="13" y2="16"/>',
+    reports: '<line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/><line x1="2" y1="20" x2="22" y2="20"/>',
+    users: '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
+    bell: '<path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>',
+    user: '<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
+    logout: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>',
+};
+
+function navIcon(name) {
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('class', 'nav-icon');
+    svg.setAttribute('viewBox', '0 0 24 24');
+    svg.setAttribute('fill', 'none');
+    svg.setAttribute('stroke', 'currentColor');
+    svg.setAttribute('stroke-width', '2');
+    svg.setAttribute('stroke-linecap', 'round');
+    svg.setAttribute('stroke-linejoin', 'round');
+    svg.setAttribute('aria-hidden', 'true');
+    svg.innerHTML = NAV_ICONS[name] || '';
+    return svg;
+}
+
 function renderNavbar() {
     const navbar = document.getElementById('navbar');
     navbar.replaceChildren();
@@ -139,16 +163,16 @@ function renderNavbar() {
     const links = [el('a', { href: home, class: 'brand' }, brandIcon, 'REGIS-TRACK')];
 
     if (state.user.role === 'student') {
-        links.push(el('a', { href: '#/student', text: 'My Requests' }));
+        links.push(el('a', { href: '#/student' }, navIcon('requests'), 'My Requests'));
     } else {
-        links.push(el('a', { href: '#/staff', text: 'Request Queue' }));
-        links.push(el('a', { href: '#/reports', text: 'Reports' }));
-        if (state.user.role === 'admin') links.push(el('a', { href: '#/admin/users', text: 'Users' }));
+        links.push(el('a', { href: '#/staff' }, navIcon('requests'), 'Request Queue'));
+        links.push(el('a', { href: '#/reports' }, navIcon('reports'), 'Reports'));
+        if (state.user.role === 'admin') links.push(el('a', { href: '#/admin/users' }, navIcon('users'), 'Users'));
     }
-    links.push(el('a', { href: '#/notifications' }, 'Notifications', state.unread > 0 ? el('span', { class: 'badge', text: String(state.unread) }) : null));
+    links.push(el('a', { href: '#/notifications' }, navIcon('bell'), 'Notifications', state.unread > 0 ? el('span', { class: 'badge', text: String(state.unread) }) : null));
     links.push(el('span', { class: 'spacer' }));
-    links.push(el('span', { text: state.user.full_name }));
-    links.push(el('a', { href: '#', text: 'Log out', onclick: logout }));
+    links.push(el('span', { class: 'user-chip' }, navIcon('user'), state.user.full_name));
+    links.push(el('a', { href: '#', onclick: logout }, navIcon('logout'), 'Log out'));
 
     navbar.replaceChildren(...links);
 }
