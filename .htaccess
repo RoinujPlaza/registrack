@@ -1,0 +1,14 @@
+# If Apache serves the project root (e.g. XAMPP htdocs alias), funnel all
+# requests into public/ so application code and config stay unreachable.
+# Preferred setup: point the vhost DocumentRoot at registrack/public directly.
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteRule ^$ public/ [L]
+    RewriteRule (.*) public/$1 [L]
+</IfModule>
+
+# Hard block sensitive paths regardless of rewrite support.
+<FilesMatch "^(DECISIONS\.md|README\.md)$">
+    Require all denied
+</FilesMatch>
+RedirectMatch 403 ^/(app|config|database|cron|logs)/

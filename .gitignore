@@ -1,0 +1,19 @@
+# Local configuration (contains credentials)
+config/config.php
+
+# Runtime artifacts
+logs/
+*.log
+storage/
+
+# Dependencies
+vendor/
+node_modules/
+
+# Environment / secrets
+.env
+.env.*
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
