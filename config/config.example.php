@@ -11,6 +11,8 @@ return [
         'env'  => 'development',
         // Never enable in production; leaks exception details to clients.
         'debug' => false,
+        // Institution-local timezone for date rules (target release dates).
+        'timezone' => 'Asia/Manila',
     ],
 
     'db' => [
@@ -42,6 +44,7 @@ return [
     'notifications' => [
         // Decision #6: in-system is always on; email is optional and retried by cron.
         'email_enabled' => false,
+        // Empty smtp_host selects the file outbox transport (dev/test).
         'smtp_host'     => '',
         'smtp_port'     => 587,
         'smtp_user'     => '',
@@ -49,5 +52,9 @@ return [
         'from_address'  => 'registrar@tcg.edu.ph',
         'from_name'     => 'TCGC Registrar - REGIS-TRACK',
         'max_attempts'  => 3,
+        // Minutes before a 'failed' email is retried by the dispatcher.
+        'retry_delay_minutes' => 5,
+        // Where FileTransport writes .eml files (dev/test only).
+        'outbox_dir' => __DIR__ . '/../storage/mail-outbox',
     ],
 ];

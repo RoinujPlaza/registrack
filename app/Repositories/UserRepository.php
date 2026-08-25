@@ -111,6 +111,16 @@ final class UserRepository
         return (int) $statement->fetchColumn();
     }
 
+    /** IDs of active registrar staff (shared-queue notification recipients). */
+    public function activeStaffIds(): array
+    {
+        $statement = $this->db->query(
+            "SELECT id FROM users WHERE role = 'staff' AND status = 'active'"
+        );
+
+        return array_map('intval', $statement->fetchAll(PDO::FETCH_COLUMN));
+    }
+
     /**
      * Paginated, filterable user list for the admin console.
      *

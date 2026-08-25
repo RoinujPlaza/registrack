@@ -55,7 +55,8 @@ final class AuthController
     public static function me(array $params): void
     {
         $user = Auth::requireUser();
-        Http::json(['user' => $user, 'csrf_token' => Csrf::token()]);
+        $unread = (new \RegisTrack\Repositories\NotificationRepository())->countUnread((int) $user['id']);
+        Http::json(['user' => $user, 'csrf_token' => Csrf::token(), 'unread_count' => $unread]);
     }
 
     /** POST /api/v1/auth/password/reset-request */

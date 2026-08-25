@@ -1,80 +1,16 @@
 # REGIS-TRACK — Phase 2 API test suite (Auth & RBAC)
-# Self-contained: boots a dev server on port 8091, runs assertions via curl.exe,
+# Self-contained: boots a dev server, runs assertions via curl.exe,
 # prints a PASS/FAIL summary, and exits non-zero on any failure.
 
-param(
-    [string]$Port = '8091'
-)
-
 $ErrorActionPreference = 'Stop'
-$ProjectRoot = Split-Path -Parent $PSScriptRoot
-$BaseUrl = "http://127.0.0.1:$Port"
-$Tmp = Join-Path $env:TEMP 'registrack-tests'
-New-Item -ItemType Directory -Path $Tmp -Force | Out-Null
-$BodyFile = Join-Path $Tmp 'last-body.json'
+. (Join-Path $PSScriptRoot '_api-lib.ps1')
+Initialize-ApiTest -ProjectRoot (Split-Path -Parent $PSScriptRoot) -Port 8091
 
-$script:pass = 0
-$script:fail = 0
-
-function Invoke-Api {
-    param(
-        [string]$Method,
-        [string]$Path,
-        [string]$Body,
-        [string]$CookieJar,
-        [hashtable]$Headers
-    )
-    $curlArgs = @('-s', '-S', '-o', $BodyFile, '-w', '%{http_code}', '-X', $Method, "$BaseUrl$Path")
-    if ($CookieJar) { $curlArgs += @('-b', $CookieJar, '-c', $CookieJar) }
-    if ($Body) {
-        # PS 5.1 quirks: (1) variable names are case-insensitive, so this file
-        # must NOT be named like $BodyFile; (2) Set-Content -Encoding UTF8 adds
-        # a BOM that breaks json_decode — write BOM-less bytes instead.
-        $reqBodyFile = Join-Path $Tmp 'request-body.json'
-        [System.IO.File]::WriteAllText($reqBodyFile, $Body, (New-Object System.Text.UTF8Encoding($false)))
-        $curlArgs += @('-H', 'Content-Type: application/json', '--data-binary', "@$reqBodyFile")
-    }
-    if ($Headers) {
-        foreach ($key in $Headers.Keys) {
-            $curlArgs += @('-H', "$($key): $($Headers[$key])")
-        }
-    }
-    $status = & curl.exe @curlArgs
-    $responseBody = ''
-    if (Test-Path $BodyFile) { $responseBody = Get-Content $BodyFile -Raw -ErrorAction SilentlyContinue }
-    [pscustomobject]@{ Status = [int]($status -as [int]); Body = $responseBody }
-}
-
-function Assert-Status {
-    param([string]$Name, [int]$Expected, [object]$Result)
-    if ($Result.Status -eq $Expected) {
-        $script:pass++
-        Write-Output "PASS  [$($Result.Status)] $Name"
-    } else {
-        $script:fail++
-        Write-Output "FAIL  [got $($Result.Status), want $Expected] $Name"
-        Write-Output "      body: $($Result.Body)"
-    }
-}
-
-# --- Boot server ---------------------------------------------------------------
-$server = Start-Process -FilePath 'php' -ArgumentList '-S', "127.0.0.1:$Port", '-t', 'public' `
-    -WorkingDirectory $ProjectRoot -PassThru -WindowStyle Hidden
+$server = Start-TestServer
 try {
-    $ready = $false
-    foreach ($i in 1..20) {
-        Start-Sleep -Milliseconds 500
-        try {
-            $h = Invoke-Api -Method 'GET' -Path '/health'
-            if ($h.Status -eq 200) { $ready = $true; break }
-        } catch { }
-    }
-    if (-not $ready) { throw 'Dev server did not become healthy on time.' }
-    Write-Output "== server ready on $BaseUrl =="
-
-    $jarAdmin = Join-Path $Tmp 'admin.jar'
-    $jarStaff = Join-Path $Tmp 'staff.jar'
-    $jarStudent = Join-Path $Tmp 'student.jar'
+    $jarAdmin = Join-Path $script:ApiTmp 'admin.jar'
+    $jarStaff = Join-Path $script:ApiTmp 'staff.jar'
+    $jarStudent = Join-Path $script:ApiTmp 'student.jar'
     Remove-Item $jarAdmin, $jarStaff, $jarStudent -ErrorAction SilentlyContinue
 
     # --- Health ------------------------------------------------------------------
@@ -179,7 +115,7 @@ try {
         -Body ('{"email":"' + $student2 + '"}')
     Assert-Status 'reset request always 202 (no enumeration)' 202 $requestReset
 
-    $log = Join-Path $ProjectRoot 'logs/app.log'
+    $log = Join-Path $script:ApiProjectRoot 'logs/app.log'
     $tokenLine = Select-String -LiteralPath $log -Pattern "reset token for $student2`: ([a-f0-9]{64})" |
         Select-Object -Last 1
     if (-not $tokenLine) { throw 'reset token not found in dev log' }
@@ -193,7 +129,7 @@ try {
         -Body ('{"token":"' + $resetToken + '","password":"AnotherPass1"}')
     Assert-Status 'reset token is single-use (400 on reuse)' 400 $reusedToken
 
-    $student2Jar = Join-Path $Tmp 'student2.jar'
+    $student2Jar = Join-Path $script:ApiTmp 'student2.jar'
     Remove-Item $student2Jar -ErrorAction SilentlyContinue
     $student2Login = Invoke-Api -Method 'POST' -Path '/api/v1/auth/login' -CookieJar $student2Jar `
         -Body ('{"email":"' + $student2 + '","password":"' + $newPassword + '"}')
@@ -210,9 +146,7 @@ try {
     # --- Audit trail sanity ---------------------------------------------------------------------
     & 'C:\xampp\mysql\bin\mysql.exe' -u root -e "USE registrack; SELECT action, COUNT(*) AS n FROM audit_events GROUP BY action ORDER BY action;"
 } finally {
-    Stop-Process -Id $server.Id -Force -ErrorAction SilentlyContinue
+    Stop-TestServer $server
 }
 
-Write-Output ''
-Write-Output "== RESULT: $($script:pass) passed, $($script:fail) failed =="
-if ($script:fail -gt 0) { exit 1 }
+Get-ApiTestSummary

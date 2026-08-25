@@ -10,31 +10,23 @@ declare(strict_types=1);
 
 use RegisTrack\Controllers\AdminController;
 use RegisTrack\Controllers\AuthController;
+use RegisTrack\Controllers\DocumentTypeController;
+use RegisTrack\Controllers\NotificationController;
+use RegisTrack\Controllers\RequestController;
+use RegisTrack\Controllers\StaffController;
 use RegisTrack\Core\AppContext;
-use RegisTrack\Core\Config;
 use RegisTrack\Core\ErrorHandler;
 use RegisTrack\Core\Http;
 use RegisTrack\Core\Router;
 
-// --- Autoloader (RegisTrack\* -> app/) ---------------------------------------
-spl_autoload_register(static function (string $class): void {
-    $prefix = 'RegisTrack\\';
-    if (!str_starts_with($class, $prefix)) {
-        return;
-    }
-    $file = dirname(__DIR__) . '/app/' . str_replace('\\', '/', substr($class, strlen($prefix))) . '.php';
-    if (is_file($file)) {
-        require $file;
-    }
-});
+// --- Bootstrap (autoloader + config live in app/bootstrap.php) ----------------
+$config = require dirname(__DIR__) . '/app/bootstrap.php';
 
-// --- Bootstrap ----------------------------------------------------------------
 // Register error handling FIRST so even bootstrap failures return the JSON
 // error envelope instead of raw HTML error output. All persistence uses UTC.
 ErrorHandler::register(dirname(__DIR__) . '/logs/app.log');
 date_default_timezone_set('UTC');
 
-$config = Config::load(dirname(__DIR__) . '/config/config.php');
 AppContext::init($config);
 ErrorHandler::register((string) $config->get('log.file', dirname(__DIR__) . '/logs/app.log'));
 
@@ -62,6 +54,22 @@ $router->add('POST', '/api/v1/auth/password/reset', [AuthController::class, 'res
 $router->add('GET', '/api/v1/admin/users', [AdminController::class, 'listUsers']);
 $router->add('POST', '/api/v1/admin/users', [AdminController::class, 'createUser']);
 $router->add('PATCH', '/api/v1/admin/users/{id}', [AdminController::class, 'updateUser']);
+
+// Phase 3 — Request submission (FR2)
+$router->add('GET', '/api/v1/document-types', [DocumentTypeController::class, 'list']);
+$router->add('POST', '/api/v1/requests', [RequestController::class, 'submit']);
+$router->add('GET', '/api/v1/requests/mine', [RequestController::class, 'listMine']);
+$router->add('GET', '/api/v1/requests/mine/{trackingNumber}', [RequestController::class, 'getMine']);
+$router->add('POST', '/api/v1/requests/mine/{trackingNumber}/cancel', [RequestController::class, 'cancel']);
+
+// Phase 4 — Workflow engine (FR3/FR5): staff queue, detail, transitions
+$router->add('GET', '/api/v1/staff/requests', [StaffController::class, 'queue']);
+$router->add('GET', '/api/v1/requests/{id}', [StaffController::class, 'detail']);
+$router->add('POST', '/api/v1/requests/{id}/transition', [StaffController::class, 'transition']);
+
+// Phase 5 — Notification panel (FR4)
+$router->add('GET', '/api/v1/notifications', [NotificationController::class, 'list']);
+$router->add('POST', '/api/v1/notifications/{id}/read', [NotificationController::class, 'markRead']);
 
 // Phase 1 verification endpoint: liveness + database connectivity.
 $router->add('GET', '/health', static function (array $params): void {
