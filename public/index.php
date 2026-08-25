@@ -12,6 +12,7 @@ use RegisTrack\Controllers\AdminController;
 use RegisTrack\Controllers\AuthController;
 use RegisTrack\Controllers\DocumentTypeController;
 use RegisTrack\Controllers\NotificationController;
+use RegisTrack\Controllers\ReportController;
 use RegisTrack\Controllers\RequestController;
 use RegisTrack\Controllers\StaffController;
 use RegisTrack\Core\AppContext;
@@ -70,6 +71,9 @@ $router->add('POST', '/api/v1/requests/{id}/transition', [StaffController::class
 // Phase 5 — Notification panel (FR4)
 $router->add('GET', '/api/v1/notifications', [NotificationController::class, 'list']);
 $router->add('POST', '/api/v1/notifications/{id}/read', [NotificationController::class, 'markRead']);
+
+// Phase 6 — Reports (FR6 / use case Table 13)
+$router->add('GET', '/api/v1/admin/reports/summary', [ReportController::class, 'summary']);
 
 // Phase 1 verification endpoint: liveness + database connectivity.
 $router->add('GET', '/health', static function (array $params): void {

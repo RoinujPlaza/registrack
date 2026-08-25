@@ -59,6 +59,16 @@ final class Http
         http_response_code(204);
     }
 
+    /** Raw file download (CSV report export). */
+    public static function csv(string $content, string $filename): void
+    {
+        self::sendHeaders();
+        http_response_code(200);
+        header('Content-Type: text/csv; charset=utf-8');
+        header('Content-Disposition: attachment; filename="' . $filename . '"');
+        echo $content;
+    }
+
     /** Decode and validate the JSON request body of write operations. */
     public static function jsonBody(): array
     {
