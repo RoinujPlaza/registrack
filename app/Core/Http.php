@@ -52,6 +52,13 @@ final class Http
         );
     }
 
+    /** 204 No Content (e.g. successful logout). */
+    public static function noContent(): void
+    {
+        self::sendHeaders();
+        http_response_code(204);
+    }
+
     /** Decode and validate the JSON request body of write operations. */
     public static function jsonBody(): array
     {

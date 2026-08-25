@@ -8,6 +8,8 @@
 
 declare(strict_types=1);
 
+use RegisTrack\Controllers\AdminController;
+use RegisTrack\Controllers\AuthController;
 use RegisTrack\Core\AppContext;
 use RegisTrack\Core\Config;
 use RegisTrack\Core\ErrorHandler;
@@ -28,8 +30,9 @@ spl_autoload_register(static function (string $class): void {
 
 // --- Bootstrap ----------------------------------------------------------------
 // Register error handling FIRST so even bootstrap failures return the JSON
-// error envelope instead of raw HTML error output.
+// error envelope instead of raw HTML error output. All persistence uses UTC.
 ErrorHandler::register(dirname(__DIR__) . '/logs/app.log');
+date_default_timezone_set('UTC');
 
 $config = Config::load(dirname(__DIR__) . '/config/config.php');
 AppContext::init($config);
@@ -49,6 +52,16 @@ session_start();
 
 // --- Routes ---------------------------------------------------------------------
 $router = new Router();
+
+// Phase 2 — Authentication & RBAC (FR1)
+$router->add('POST', '/api/v1/auth/login', [AuthController::class, 'login']);
+$router->add('POST', '/api/v1/auth/logout', [AuthController::class, 'logout']);
+$router->add('GET', '/api/v1/me', [AuthController::class, 'me']);
+$router->add('POST', '/api/v1/auth/password/reset-request', [AuthController::class, 'requestPasswordReset']);
+$router->add('POST', '/api/v1/auth/password/reset', [AuthController::class, 'resetPassword']);
+$router->add('GET', '/api/v1/admin/users', [AdminController::class, 'listUsers']);
+$router->add('POST', '/api/v1/admin/users', [AdminController::class, 'createUser']);
+$router->add('PATCH', '/api/v1/admin/users/{id}', [AdminController::class, 'updateUser']);
 
 // Phase 1 verification endpoint: liveness + database connectivity.
 $router->add('GET', '/health', static function (array $params): void {

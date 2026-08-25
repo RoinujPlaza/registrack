@@ -77,7 +77,7 @@ For Apache serving, point a vhost `DocumentRoot` at `registrack/public`
 
 - [x] Phase 0 — scope freeze, decisions, exclusions
 - [x] Phase 1 — skeleton: front controller, router, config, error handling, schema, seed
-- [ ] Phase 2 — authentication & RBAC (login, lockout, sessions, user admin)
+- [x] Phase 2 — authentication & RBAC (login, lockout, sessions, user admin) — 26/26 API tests passing
 - [ ] Phase 3 — request submission (FR2) with idempotency
 - [ ] Phase 4 — workflow engine (FR3/FR5): state machine, history, audit, concurrency
 - [ ] Phase 5 — notifications (FR4): in-system + cron email dispatcher
