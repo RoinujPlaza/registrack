@@ -25,9 +25,11 @@ final class RequestRepository
     public function findById(int $id): ?array
     {
         $statement = $this->db->prepare(
-            'SELECT r.*, t.name AS document_type_name
+            'SELECT r.*, t.name AS document_type_name,
+                    s.full_name AS student_name, s.student_number AS student_number
              FROM requests r
              JOIN document_types t ON t.id = r.document_type_id
+             JOIN users s ON s.id = r.student_id
              WHERE r.id = ?
              LIMIT 1'
         );

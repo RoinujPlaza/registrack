@@ -109,4 +109,15 @@ $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 $uri    = $_SERVER['REQUEST_URI'] ?? '/';
 $path   = parse_url($uri, PHP_URL_PATH) ?: '/';
 
+// The SPA shell: hash routing means the browser only ever needs "/".
+// API endpoints and /health below remain pure JSON.
+if ($path === '/' && $method === 'GET') {
+    $shell = __DIR__ . '/index.html';
+    if (is_file($shell)) {
+        header('Content-Type: text/html; charset=utf-8');
+        readfile($shell);
+        exit;
+    }
+}
+
 $router->dispatch($method, $path);

@@ -42,6 +42,16 @@ registrack/
 └── logs/                   # Runtime application log (gitignored)
 ```
 
+## Running the web app
+
+```powershell
+php -S 127.0.0.1:8090 -t public
+```
+
+Open `http://127.0.0.1:8090/` and log in with a seeded account (below).
+The SPA (public/index.html + assets) talks to the same PHP API; hash routes:
+`#/login`, `#/student`, `#/staff`, `#/reports`, `#/notifications`, `#/admin/users`.
+
 ## Local setup (XAMPP)
 
 1. Start **Apache** and **MySQL** from the XAMPP control panel.
@@ -83,4 +93,4 @@ For Apache serving, point a vhost `DocumentRoot` at `registrack/public`
 - [x] Phase 5 - notifications (FR4): dual-channel queueing, cron email dispatcher with retry/exhaustion, notification panel - 28/28 API tests passing
 - [x] Phase 6 - search + reports (FR6): full filter matrix, pagination, summary report (JSON/CSV/print-ready), export auditing - 32/32 API tests passing
 - [x] Phase 7 - hardening: security checklist (SECURITY.md), restricted-DB-user verification, absolute session lifetime, per-IP login throttle, backup/restore drill - 14/14 API tests passing (164 total)
-- [ ] Phase 8 - SPA frontend + UAT + deployment
+- [x] Phase 8 - SPA frontend (login, student/staff/admin dashboards, notifications, reports) + deployment runbook (DEPLOYMENT.md) - browser E2E smoke test passed

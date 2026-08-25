@@ -435,6 +435,8 @@ final class RequestService
             'tracking_number' => (string) $request['tracking_number'],
             'document_type_id' => (int) $request['document_type_id'],
             'document_type_name' => (string) $request['document_type_name'],
+            'student_name' => $request['student_name'] ?? null,
+            'student_number' => $request['student_number'] ?? null,
             'quantity' => (int) $request['quantity'],
             'purpose' => (string) $request['purpose'],
             'target_release_date' => (string) $request['target_release_date'],
