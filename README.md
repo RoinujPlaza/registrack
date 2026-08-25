@@ -82,5 +82,5 @@ For Apache serving, point a vhost `DocumentRoot` at `registrack/public`
 - [x] Phase 4 - workflow engine (FR3/FR5): state machine, transitions with concurrency guard, history + audit views - 31/31 API tests passing
 - [x] Phase 5 - notifications (FR4): dual-channel queueing, cron email dispatcher with retry/exhaustion, notification panel - 28/28 API tests passing
 - [x] Phase 6 - search + reports (FR6): full filter matrix, pagination, summary report (JSON/CSV/print-ready), export auditing - 32/32 API tests passing
-- [ ] Phase 7 - hardening: security checklist, restricted-DB-user verification, backup/restore drill
+- [x] Phase 7 - hardening: security checklist (SECURITY.md), restricted-DB-user verification, absolute session lifetime, per-IP login throttle, backup/restore drill - 14/14 API tests passing (164 total)
 - [ ] Phase 8 - SPA frontend + UAT + deployment

@@ -38,6 +38,16 @@ final class Auth
             Http::error('session_expired', 'Session expired due to inactivity. Please log in again.', 401);
             exit;
         }
+
+        // Absolute lifetime cap: even an active session must eventually die.
+        $maxMinutes = (float) AppContext::instance()->config()->get('auth.session_max_minutes', 480);
+        $createdAt = isset($_SESSION['session_created_at']) ? (int) $_SESSION['session_created_at'] : null;
+        if ($maxMinutes > 0 && $createdAt !== null && (time() - $createdAt) > (int) ($maxMinutes * 60)) {
+            self::destroySession();
+            Http::error('session_expired', 'Session has reached its maximum lifetime. Please log in again.', 401);
+            exit;
+        }
+
         $_SESSION['last_activity'] = time();
 
         return $user;
@@ -71,6 +81,7 @@ final class Auth
         session_regenerate_id(true);
         $_SESSION['user'] = $user;
         $_SESSION['last_activity'] = time();
+        $_SESSION['session_created_at'] = time();
         $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
     }
 

@@ -16,6 +16,7 @@ GRANT SELECT, INSERT, UPDATE ON registrack.requests         TO 'registrack_app'@
 GRANT SELECT, INSERT         ON registrack.request_history  TO 'registrack_app'@'localhost';
 GRANT SELECT, INSERT         ON registrack.audit_events     TO 'registrack_app'@'localhost';
 GRANT SELECT, INSERT, UPDATE ON registrack.notifications    TO 'registrack_app'@'localhost';
+GRANT SELECT, INSERT, UPDATE ON registrack.password_resets  TO 'registrack_app'@'localhost';
 GRANT SELECT, UPDATE         ON registrack.system_settings   TO 'registrack_app'@'localhost';
 
 -- Migration/administrative user (schema changes only, run manually) ------------

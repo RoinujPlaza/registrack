@@ -33,6 +33,11 @@ return [
         'max_failed_attempts' => 5,
         'lockout_minutes'     => 15,
         'session_idle_minutes' => 30,
+        // Absolute session lifetime (0 = disabled). Defence against stolen cookies.
+        'session_max_minutes' => 480,
+        // Per-IP login throttle: block the IP after N failed attempts in the window (0 = disabled).
+        'ip_throttle_max_failures' => 20,
+        'ip_throttle_window_minutes' => 10,
     ],
 
     'requests' => [

@@ -5,6 +5,7 @@ config/config.php
 logs/
 *.log
 storage/
+backups/
 
 # Dependencies
 vendor/

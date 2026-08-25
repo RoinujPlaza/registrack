@@ -35,4 +35,18 @@ final class AuditRepository
 
         return $statement->fetchAll();
     }
+
+    /** Recent failed logins from one client fingerprint (per-IP login throttle). */
+    public function countRecentFailuresByIp(string $ipHash, int $windowMinutes): int
+    {
+        $statement = $this->db->prepare(
+            "SELECT COUNT(*) FROM audit_events
+             WHERE action = 'login.failure'
+               AND ip_hash = ?
+               AND created_at >= DATE_SUB(UTC_TIMESTAMP(), INTERVAL ? MINUTE)"
+        );
+        $statement->execute([$ipHash, $windowMinutes]);
+
+        return (int) $statement->fetchColumn();
+    }
 }

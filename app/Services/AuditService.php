@@ -15,6 +15,14 @@ use RegisTrack\Core\Http;
  */
 final class AuditService
 {
+    /** Privacy-preserving client fingerprint shared by throttle and audit writes. */
+    public static function ipHash(): ?string
+    {
+        $ip = (string) ($_SERVER['REMOTE_ADDR'] ?? '');
+
+        return $ip === '' ? null : hash('sha256', $ip);
+    }
+
     /**
      * @param string $action    dotted event name, e.g. login.failure, user.created
      * @param string $entity    entity type, e.g. user, request
@@ -30,7 +38,6 @@ final class AuditService
         ?array $after = null
     ): void {
         $user = Auth::user();
-        $ip = (string) ($_SERVER['REMOTE_ADDR'] ?? '');
 
         $statement = AppContext::instance()->db()->prepare(
             'INSERT INTO audit_events
@@ -47,7 +54,7 @@ final class AuditService
             $entity,
             $before === null ? null : json_encode($before, JSON_UNESCAPED_SLASHES),
             $after === null ? null : json_encode($after, JSON_UNESCAPED_SLASHES),
-            $ip === '' ? null : hash('sha256', $ip),
+            self::ipHash(),
             Http::correlationId(),
         ]);
     }

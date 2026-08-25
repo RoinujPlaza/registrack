@@ -7,6 +7,7 @@ namespace RegisTrack\Services;
 use RegisTrack\Core\Auth;
 use RegisTrack\Core\Csrf;
 use RegisTrack\Core\ErrorHandler;
+use RegisTrack\Repositories\AuditRepository;
 use RegisTrack\Repositories\UserRepository;
 
 /**
@@ -31,6 +32,25 @@ final class AuthService
         $repository = new UserRepository();
         $config = \RegisTrack\Core\AppContext::instance()->config();
 
+        // Per-IP throttle: too many recent failures from one client -> refuse
+        // before touching credentials at all.
+        $throttleMax = (int) $config->get('auth.ip_throttle_max_failures', 20);
+        $throttleWindow = (int) $config->get('auth.ip_throttle_window_minutes', 10);
+        if ($throttleMax > 0) {
+            $ipHash = AuditService::ipHash();
+            if ($ipHash !== null) {
+                $recentFailures = (new AuditRepository())->countRecentFailuresByIp($ipHash, $throttleWindow);
+                if ($recentFailures >= $throttleMax) {
+                    return [
+                        'ok' => false,
+                        'status' => 429,
+                        'code' => 'too_many_attempts',
+                        'message' => "Too many failed login attempts. Try again in {$throttleWindow} minutes.",
+                    ];
+                }
+            }
+        }
+
         $user = $repository->findByEmail($email);
         $invalid = static fn (): array => [
             'ok' => false,
@@ -45,6 +65,12 @@ final class AuthService
 
         // Locked accounts are rejected before credential verification.
         if ($user['locked_until'] !== null && strtotime((string) $user['locked_until']) > time()) {
+            // A locked-account attempt is still a failed attempt for the IP throttle.
+            AuditService::record('login.failure', 'user', null, null, [
+                'email' => mb_strtolower($email),
+                'reason' => 'account_locked',
+            ]);
+
             return [
                 'ok' => false,
                 'status' => 423,
