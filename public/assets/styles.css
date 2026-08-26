@@ -110,10 +110,10 @@ body {
 .sidebar-footer a {
     display: flex; align-items: center; gap: 0.45rem;
     color: #eaf5f0; text-decoration: none;
-    padding: 0.4rem 0; border-radius: 6px;
-    font-size: 0.85rem;
+    padding: 0.35rem 0.5rem; border-radius: 6px;
+    font-size: 0.82rem; opacity: 0.85;
 }
-.sidebar-footer a:hover { background: var(--green-dark); }
+.sidebar-footer a:hover { background: var(--green-dark); opacity: 1; }
 
 /* Main content area */
 .main-content {
