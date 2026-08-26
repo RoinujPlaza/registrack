@@ -88,7 +88,7 @@ async function api(path, { method = 'GET', body, headers = {} } = {}) {
     if (!response.ok) {
         if (response.status === 401 && state.user) {
             state.user = null;
-            renderNavbar();
+            renderSidebar();
             location.hash = '#/login';
         }
         const error = new Error(payload?.error?.message || 'Request failed.');
@@ -128,7 +128,7 @@ function fieldError(errors, name) {
     return errors && errors[name] ? el('p', { class: 'field-error', text: errors[name] }) : null;
 }
 
-/* Inline stroke icons (Feather-style, 24x24) for the navbar. */
+/* Inline stroke icons (Feather-style, 24x24) for the sidebar. */
 const NAV_ICONS = {
     requests: '<path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="8" y1="16" x2="13" y2="16"/>',
     reports: '<line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/><line x1="2" y1="20" x2="22" y2="20"/>',
@@ -152,29 +152,66 @@ function navIcon(name) {
     return svg;
 }
 
-function renderNavbar() {
-    const navbar = document.getElementById('navbar');
-    navbar.replaceChildren();
-    if (!state.user) { navbar.classList.add('hidden'); return; }
-    navbar.classList.remove('hidden');
+function renderSidebar() {
+    const sidebar = document.getElementById('sidebar');
+    const toggle = document.getElementById('sidebar-toggle');
+    const overlay = document.getElementById('sidebar-overlay');
+    sidebar.replaceChildren();
+
+    if (!state.user) {
+        sidebar.classList.add('hidden');
+        toggle.classList.add('hidden');
+        overlay.classList.add('hidden');
+        return;
+    }
+
+    sidebar.classList.remove('hidden');
+    toggle.classList.remove('hidden');
+
+    const closeSidebar = () => {
+        document.body.classList.remove('sidebar-open');
+        overlay.classList.remove('active');
+    };
+
+    // Toggle button opens/closes sidebar on mobile
+    toggle.onclick = () => {
+        document.body.classList.toggle('sidebar-open');
+        overlay.classList.toggle('active');
+    };
+    overlay.onclick = closeSidebar;
 
     const home = state.user.role === 'student' ? '#/student' : '#/staff';
+
+    /* --- Sidebar brand header --- */
     const brandIcon = el('img', { src: '/assets/icon-128.png', alt: '', class: 'brand-icon' });
-    const links = [el('a', { href: home, class: 'brand' }, brandIcon, 'REGIS-TRACK')];
+    const brand = el('a', { href: home, class: 'sidebar-brand' }, brandIcon, 'REGIS-TRACK');
+    brand.addEventListener('click', closeSidebar);
+
+    /* --- Navigation links --- */
+    const navLinks = el('div', { class: 'sidebar-links' });
+
+    const addLink = (href, iconName, label, extra) => {
+        const link = el('a', { href }, navIcon(iconName), label, extra || null);
+        link.addEventListener('click', closeSidebar);
+        navLinks.appendChild(link);
+    };
 
     if (state.user.role === 'student') {
-        links.push(el('a', { href: '#/student' }, navIcon('requests'), 'My Requests'));
+        addLink('#/student', 'requests', 'My Requests');
     } else {
-        links.push(el('a', { href: '#/staff' }, navIcon('requests'), 'Request Queue'));
-        links.push(el('a', { href: '#/reports' }, navIcon('reports'), 'Reports'));
-        if (state.user.role === 'admin') links.push(el('a', { href: '#/admin/users' }, navIcon('users'), 'Users'));
+        addLink('#/staff', 'requests', 'Request Queue');
+        addLink('#/reports', 'reports', 'Reports');
+        if (state.user.role === 'admin') addLink('#/admin/users', 'users', 'Users');
     }
-    links.push(el('a', { href: '#/notifications' }, navIcon('bell'), 'Notifications', state.unread > 0 ? el('span', { class: 'badge', text: String(state.unread) }) : null));
-    links.push(el('span', { class: 'spacer' }));
-    links.push(el('span', { class: 'user-chip' }, navIcon('user'), state.user.full_name));
-    links.push(el('a', { href: '#', onclick: logout }, navIcon('logout'), 'Log out'));
+    addLink('#/notifications', 'bell', 'Notifications', state.unread > 0 ? el('span', { class: 'badge', text: String(state.unread) }) : null);
 
-    navbar.replaceChildren(...links);
+    /* --- Sidebar footer: user info + logout --- */
+    const userLabel = el('span', { class: 'sidebar-user' }, navIcon('user'), state.user.full_name);
+    const logoutLink = el('a', { href: '#', onclick: logout }, navIcon('logout'), 'Log out');
+    logoutLink.addEventListener('click', closeSidebar);
+    const sidebarFooter = el('div', { class: 'sidebar-footer' }, userLabel, logoutLink);
+
+    sidebar.replaceChildren(brand, navLinks, sidebarFooter);
 }
 
 async function logout(event) {
@@ -183,7 +220,7 @@ async function logout(event) {
     state.user = null;
     state.csrf = null;
     state.unread = 0;
-    renderNavbar();
+    renderSidebar();
     location.hash = '#/login';
 }
 
@@ -191,7 +228,7 @@ async function logout(event) {
 function route() {
     const hash = location.hash || '#/';
     const app = document.getElementById('app');
-    renderNavbar();
+    renderSidebar();
 
     if (!state.user) { viewLogin(); return; }
 
@@ -259,7 +296,7 @@ async function refreshUnread() {
         const result = await api('/api/v1/me');
         state.user = result.data.user;
         state.unread = result.data.unread_count;
-        renderNavbar();
+        renderSidebar();
     } catch { /* handled by api() */ }
 }
 

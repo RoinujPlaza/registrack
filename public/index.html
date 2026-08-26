@@ -15,8 +15,16 @@
     <noscript>
         <p class="noscript">REGIS-TRACK requires JavaScript. Please enable it and reload.</p>
     </noscript>
-    <header id="navbar" class="navbar hidden"></header>
-    <main id="app" class="container" aria-live="polite"></main>
+    <button id="sidebar-toggle" class="sidebar-toggle hidden" aria-label="Open navigation menu">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+        </svg>
+    </button>
+    <div id="sidebar-overlay" class="sidebar-overlay hidden"></div>
+    <div class="shell">
+        <nav id="sidebar" class="sidebar hidden" aria-label="Main navigation"></nav>
+        <main id="app" class="main-content" aria-live="polite"></main>
+    </div>
     <footer class="footer">
         <small>REGIS-TRACK &middot; Office of the College Registrar &middot; Tangub City Global College</small>
     </footer>
