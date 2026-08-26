@@ -54,7 +54,7 @@ return [
         'smtp_port'     => 587,
         'smtp_user'     => '',
         'smtp_password' => '',
-        'from_address'  => 'registrar@tcg.edu.ph',
+        'from_address'  => 'registrar@tcgc.edu.ph',
         'from_name'     => 'TCGC Registrar - REGIS-TRACK',
         'max_attempts'  => 3,
         // Minutes before a 'failed' email is retried by the dispatcher.

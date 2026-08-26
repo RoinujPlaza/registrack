@@ -217,7 +217,7 @@ function viewLogin(errorText, fieldErrors = {}) {
     const app = document.getElementById('app');
     app.replaceChildren();
 
-    const emailInput = el('input', { type: 'email', name: 'email', required: true, autocomplete: 'username', placeholder: 'you@tcg.edu.ph' });
+    const emailInput = el('input', { type: 'email', name: 'email', required: true, autocomplete: 'username', placeholder: 'you@tcgc.edu.ph' });
     const passwordInput = el('input', { type: 'password', name: 'password', required: true, autocomplete: 'current-password' });
     const errorSlot = el('div');
 
@@ -638,7 +638,7 @@ async function viewAdminUsers(formState = {}) {
     ));
 
     const errorSlot = el('div');
-    const emailInput = el('input', { type: 'email', required: true, placeholder: 'new.user@tcg.edu.ph', value: formState.email || '' });
+    const emailInput = el('input', { type: 'email', required: true, placeholder: 'new.user@tcgc.edu.ph', value: formState.email || '' });
     const nameInput = el('input', { type: 'text', required: true, placeholder: 'Full name', value: formState.fullName || '' });
     const roleSelect = el('select', {},
         el('option', { value: 'student', text: 'Student' }),

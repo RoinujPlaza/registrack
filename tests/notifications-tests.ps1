@@ -35,12 +35,12 @@ try {
     Remove-Item $jarStudent, $jarStaff -ErrorAction SilentlyContinue
 
     $loginStudent = Invoke-Api -Method 'POST' -Path '/api/v1/auth/login' -CookieJar $jarStudent `
-        -Body '{"email":"student1@tcg.edu.ph","password":"Password123!"}'
+        -Body '{"email":"student1@tcgc.edu.ph","password":"Password123!"}'
     Assert-Status 'student login' 200 $loginStudent
     $csrfStudent = ((($loginStudent.Body | ConvertFrom-Json).data).csrf_token)
 
     $loginStaff = Invoke-Api -Method 'POST' -Path '/api/v1/auth/login' -CookieJar $jarStaff `
-        -Body '{"email":"staff1@tcg.edu.ph","password":"Password123!"}'
+        -Body '{"email":"staff1@tcgc.edu.ph","password":"Password123!"}'
     Assert-Status 'staff login' 200 $loginStaff
     $csrfStaff = ((($loginStaff.Body | ConvertFrom-Json).data).csrf_token)
 
@@ -87,7 +87,7 @@ try {
     $jarStudentB = Join-Path $script:ApiTmp 'studentB.jar'
     Remove-Item $jarStudentB -ErrorAction SilentlyContinue
     $loginB = Invoke-Api -Method 'POST' -Path '/api/v1/auth/login' -CookieJar $jarStudentB `
-        -Body '{"email":"student3@tcg.edu.ph","password":"Password123!"}'
+        -Body '{"email":"student3@tcgc.edu.ph","password":"Password123!"}'
     $csrfB = ((($loginB.Body | ConvertFrom-Json).data).csrf_token)
     Assert-Status 'foreign notification id returns 404' 404 `
         (Invoke-Api -Method 'POST' -Path "/api/v1/notifications/$firstNotificationId/read" -CookieJar $jarStudentB `

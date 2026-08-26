@@ -55,7 +55,7 @@ try {
 
     # --- Full API pass under the restricted DB user --------------------------------
     $login = Invoke-Api -Method 'POST' -Path '/api/v1/auth/login' -CookieJar $jarStudent `
-        -Body '{"email":"student1@tcg.edu.ph","password":"Password123!"}'
+        -Body '{"email":"student1@tcgc.edu.ph","password":"Password123!"}'
     Assert-Status 'login under least-privilege DB user' 200 $login
     $csrf = ((($login.Body | ConvertFrom-Json).data).csrf_token)
 
@@ -101,12 +101,12 @@ try {
 
     for ($i = 1; $i -le 3; $i++) {
         $bad = Invoke-Api -Method 'POST' -Path '/api/v1/auth/login' `
-            -Body '{"email":"student1@tcg.edu.ph","password":"WrongPass1"}'
+            -Body '{"email":"student1@tcgc.edu.ph","password":"WrongPass1"}'
         if ($bad.Status -ne 401) { throw "throttle attempt $i returned $($bad.Status), expected 401" }
     }
 
     $throttled = Invoke-Api -Method 'POST' -Path '/api/v1/auth/login' -CookieJar $jar2 `
-        -Body '{"email":"student1@tcg.edu.ph","password":"Password123!"}'
+        -Body '{"email":"student1@tcgc.edu.ph","password":"Password123!"}'
     Assert-Status 'valid credentials refused once IP throttle trips (429)' 429 $throttled
     Assert-True 'throttle error code is too_many_attempts' `
         ($throttled.Body -match 'too_many_attempts')

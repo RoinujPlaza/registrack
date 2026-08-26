@@ -15,7 +15,7 @@ Data rule: **anonymized seed data only** (`database/seed.sql` — fictional name
 4. Create `config/config.php` from the example with the host's DB credentials.
 5. Set `system_settings.notification_email_enabled = '0'` (in-system only —
    free hosts typically block outbound SMTP).
-6. Smoke test: open `/` → login page; log in as `admin@tcg.edu.ph`;
+6. Smoke test: open `/` → login page; log in as `admin@tcgc.edu.ph`;
    `/health` returns `"status":"ok"`.
 
 ## B. Pilot with real data (approved institutional host) — gates

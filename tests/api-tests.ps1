@@ -18,14 +18,14 @@ try {
 
     # --- Login -------------------------------------------------------------------
     $bad = Invoke-Api -Method 'POST' -Path '/api/v1/auth/login' `
-        -Body '{"email":"student1@tcg.edu.ph","password":"WrongPassword1"}'
+        -Body '{"email":"student1@tcgc.edu.ph","password":"WrongPassword1"}'
     Assert-Status 'invalid password rejected with generic 401' 401 $bad
 
     $noBody = Invoke-Api -Method 'POST' -Path '/api/v1/auth/login' -Body '{}'
     Assert-Status 'missing fields rejected with 422' 422 $noBody
 
     $studentLogin = Invoke-Api -Method 'POST' -Path '/api/v1/auth/login' `
-        -Body '{"email":"student1@tcg.edu.ph","password":"Password123!"}' -CookieJar $jarStudent
+        -Body '{"email":"student1@tcgc.edu.ph","password":"Password123!"}' -CookieJar $jarStudent
     Assert-Status 'student login succeeds' 200 $studentLogin
     $studentCsrf = ((($studentLogin.Body | ConvertFrom-Json).data).csrf_token)
     if (-not $studentCsrf) { throw 'student login did not return a CSRF token' }
@@ -42,14 +42,14 @@ try {
         (Invoke-Api -Method 'GET' -Path '/api/v1/me')
 
     $staffLogin = Invoke-Api -Method 'POST' -Path '/api/v1/auth/login' `
-        -Body '{"email":"staff1@tcg.edu.ph","password":"Password123!"}' -CookieJar $jarStaff
+        -Body '{"email":"staff1@tcgc.edu.ph","password":"Password123!"}' -CookieJar $jarStaff
     Assert-Status 'staff login succeeds' 200 $staffLogin
 
     Assert-Status 'staff blocked from admin user list (403)' 403 `
         (Invoke-Api -Method 'GET' -Path '/api/v1/admin/users' -CookieJar $jarStaff)
 
     $adminLogin = Invoke-Api -Method 'POST' -Path '/api/v1/auth/login' `
-        -Body '{"email":"admin@tcg.edu.ph","password":"Password123!"}' -CookieJar $jarAdmin
+        -Body '{"email":"admin@tcgc.edu.ph","password":"Password123!"}' -CookieJar $jarAdmin
     Assert-Status 'admin login succeeds' 200 $adminLogin
     $adminCsrf = ((($adminLogin.Body | ConvertFrom-Json).data).csrf_token)
     if (-not $adminCsrf) { throw 'admin login did not return a CSRF token' }
@@ -59,12 +59,12 @@ try {
 
     # --- CSRF protection -------------------------------------------------------------
     $noCsrf = Invoke-Api -Method 'POST' -Path '/api/v1/admin/users' -CookieJar $jarAdmin `
-        -Body '{"email":"x@tcg.edu.ph","password":"Password123!","role":"student","full_name":"X"}'
+        -Body '{"email":"x@tcgc.edu.ph","password":"Password123!","role":"student","full_name":"X"}'
     Assert-Status 'write without CSRF token rejected (403)' 403 $noCsrf
 
     # --- Admin: create user -----------------------------------------------------------
     $stamp = Get-Date -Format 'yyyyMMddHHmmss'
-    $newEmail = "lockme$stamp@tcg.edu.ph"
+    $newEmail = "lockme$stamp@tcgc.edu.ph"
     $created = Invoke-Api -Method 'POST' -Path '/api/v1/admin/users' -CookieJar $jarAdmin `
         -Headers @{ 'X-CSRF-Token' = $adminCsrf } `
         -Body ('{"email":"' + $newEmail + '","password":"LockTarget1","role":"student","full_name":"Lock Target","student_number":"' + $stamp + '"}')
@@ -79,7 +79,7 @@ try {
 
     $weak = Invoke-Api -Method 'POST' -Path '/api/v1/admin/users' -CookieJar $jarAdmin `
         -Headers @{ 'X-CSRF-Token' = $adminCsrf } `
-        -Body '{"email":"weak$stamp@tcg.edu.ph","password":"short","role":"staff","full_name":"Weak"}'
+        -Body '{"email":"weak$stamp@tcgc.edu.ph","password":"short","role":"staff","full_name":"Weak"}'
     Assert-Status 'weak password rejected with 422' 422 $weak
 
     # --- Account lockout (use case 4a) --------------------------------------------------
@@ -109,7 +109,7 @@ try {
     Assert-Status 'admin cannot disable own account (409)' 409 $selfDisable
 
     # --- Password reset round-trip -----------------------------------------------------------
-    $student2 = 'student2@tcg.edu.ph'
+    $student2 = 'student2@tcgc.edu.ph'
     $newPassword = 'FreshPass2026'
     $requestReset = Invoke-Api -Method 'POST' -Path '/api/v1/auth/password/reset-request' `
         -Body ('{"email":"' + $student2 + '"}')

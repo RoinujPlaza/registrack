@@ -16,22 +16,22 @@ INSERT INTO document_types (name, description, is_active) VALUES
 
 -- Accounts ----------------------------------------------------------------------
 INSERT INTO users (email, password_hash, role, status, student_number, full_name, program) VALUES
-    ('admin@tcg.edu.ph',
+    ('admin@tcgc.edu.ph',
      '$2y$10$0amOA5CgyNX6/W/XKdWv0eaPOFW6FEVhwV6RoPXKMX01M7/C5X6LO',
      'admin',  'active', NULL, 'TCGC Registrar Administrator', NULL),
-    ('staff1@tcg.edu.ph',
+    ('staff1@tcgc.edu.ph',
      '$2y$10$0amOA5CgyNX6/W/XKdWv0eaPOFW6FEVhwV6RoPXKMX01M7/C5X6LO',
      'staff',  'active', NULL, 'Registrar Staff One', NULL),
-    ('staff2@tcg.edu.ph',
+    ('staff2@tcgc.edu.ph',
      '$2y$10$0amOA5CgyNX6/W/XKdWv0eaPOFW6FEVhwV6RoPXKMX01M7/C5X6LO',
      'staff',  'active', NULL, 'Registrar Staff Two', NULL),
-    ('student1@tcg.edu.ph',
+    ('student1@tcgc.edu.ph',
      '$2y$10$0amOA5CgyNX6/W/XKdWv0eaPOFW6FEVhwV6RoPXKMX01M7/C5X6LO',
      'student', 'active', '2023-00001', 'Juan Dela Cruz', 'BS Information Technology'),
-    ('student2@tcg.edu.ph',
+    ('student2@tcgc.edu.ph',
      '$2y$10$0amOA5CgyNX6/W/XKdWv0eaPOFW6FEVhwV6RoPXKMX01M7/C5X6LO',
      'student', 'active', '2023-00002', 'Maria Santos', 'BS Education'),
-    ('student3@tcg.edu.ph',
+    ('student3@tcgc.edu.ph',
      '$2y$10$0amOA5CgyNX6/W/XKdWv0eaPOFW6FEVhwV6RoPXKMX01M7/C5X6LO',
      'student', 'active', '2022-00003', 'Pedro Ramos', 'BS Business Administration');
 

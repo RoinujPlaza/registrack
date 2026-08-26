@@ -15,12 +15,12 @@ try {
 
     # --- Sessions --------------------------------------------------------------
     $loginStudent = Invoke-Api -Method 'POST' -Path '/api/v1/auth/login' -CookieJar $jarStudent `
-        -Body '{"email":"student1@tcg.edu.ph","password":"Password123!"}'
+        -Body '{"email":"student1@tcgc.edu.ph","password":"Password123!"}'
     Assert-Status 'student login' 200 $loginStudent
     $csrfStudent = ((($loginStudent.Body | ConvertFrom-Json).data).csrf_token)
 
     $loginStaff = Invoke-Api -Method 'POST' -Path '/api/v1/auth/login' -CookieJar $jarStaff `
-        -Body '{"email":"staff1@tcg.edu.ph","password":"Password123!"}'
+        -Body '{"email":"staff1@tcgc.edu.ph","password":"Password123!"}'
     Assert-Status 'staff login' 200 $loginStaff
     $csrfStaff = ((($loginStaff.Body | ConvertFrom-Json).data).csrf_token)
 
