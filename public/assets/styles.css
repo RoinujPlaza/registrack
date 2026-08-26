@@ -244,6 +244,29 @@ tr.clickable:hover { background: #f2f7f4; }
     .filters .wide { grid-column: auto; }
 }
 
+/* Reports filter bar — keep Generate / Print / Download CSV on one horizontal row.
+   The generic .filters bar has 6 columns for the queue; reports only has 3
+   fields + actions, so without this the 165px actions cell forces vertical
+   stacking (issue: Generate/Print/CSV each on its own line). */
+.filters.report-filters .actions {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+@media (min-width: 960px) {
+    .filters.report-filters {
+        grid-template-columns: 1fr 1fr 0.9fr auto;
+    }
+    .filters.report-filters .actions {
+        grid-column: auto;
+        flex-wrap: nowrap;
+    }
+}
+
 /* Login */
 .login-box { max-width: 380px; margin: 3rem auto; text-align: center; }
 .login-box h1 { text-align: center; color: var(--green-dark); }

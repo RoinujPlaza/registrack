@@ -768,7 +768,7 @@ async function viewReports() {
 
     app.replaceChildren(
         el('h1', { text: 'Reports & analytics' }),
-        el('div', { class: 'card filters' },
+        el('div', { class: 'card filters report-filters' },
             el('div', {}, el('label', { text: 'From' }), fromInput),
             el('div', {}, el('label', { text: 'To' }), toInput),
             el('div', {}, el('label', { text: 'Status' }), statusSelect),
