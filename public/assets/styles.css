@@ -90,8 +90,11 @@ body {
 .sidebar-links a:hover, .sidebar-links a.active {
     background: var(--green-dark);
 }
-.sidebar-links .nav-icon { width: 16px; height: 16px; flex-shrink: 0; opacity: 0.85; }
+.nav-icon { width: 16px; height: 16px; flex-shrink: 0; }
+.sidebar-links .nav-icon { opacity: 0.85; }
 .sidebar-links a:hover .nav-icon { opacity: 1; }
+.sidebar-footer a .nav-icon { opacity: 0.85; }
+.sidebar-footer a:hover .nav-icon { opacity: 1; }
 .sidebar-links .badge {
     background: #ffd60a; color: #333; border-radius: 999px;
     font-size: 0.72rem; padding: 0.05rem 0.45rem; margin-left: auto; font-weight: 700;
