@@ -18,6 +18,29 @@ const state = {
 /* One-shot message that survives a single view re-render (e.g. after submit). */
 let flash = null;
 
+/* --- Theme (light/dark) — persisted, no server involvement --------------- */
+const THEME_KEY = 'regis-track-theme';
+function getSavedTheme() {
+    try { return localStorage.getItem(THEME_KEY); } catch { return null; }
+}
+function applyTheme(theme) {
+    const t = theme === 'dark' ? 'dark' : 'light';
+    document.documentElement.setAttribute('data-theme', t);
+    try { localStorage.setItem(THEME_KEY, t); } catch { /* storage unavailable */ }
+}
+function currentTheme() {
+    return document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+}
+function toggleTheme() {
+    applyTheme(currentTheme() === 'dark' ? 'light' : 'dark');
+}
+(function initTheme() {
+    const saved = getSavedTheme();
+    if (saved === 'dark' || saved === 'light') { applyTheme(saved); return; }
+    const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+    applyTheme(prefersDark ? 'dark' : 'light');
+})();
+
 const STATUS_LABELS = {
     pending: 'Pending',
     needs_information: 'Needs Information',
@@ -136,6 +159,8 @@ const NAV_ICONS = {
     bell: '<path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>',
     user: '<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
     logout: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>',
+    sun: '<circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>',
+    moon: '<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>',
 };
 
 function navIcon(name) {
@@ -205,11 +230,17 @@ function renderSidebar() {
     }
     addLink('#/notifications', 'bell', 'Notifications', state.unread > 0 ? el('span', { class: 'badge', text: String(state.unread) }) : null);
 
-    /* --- Sidebar footer: user info + logout --- */
+    /* --- Sidebar footer: user info + theme + logout --- */
     const userLabel = el('span', { class: 'sidebar-user' }, navIcon('user'), state.user.full_name);
+    const isDark = currentTheme() === 'dark';
+    const themeToggle = el('button', {
+        class: 'theme-toggle', type: 'button',
+        onclick: () => { toggleTheme(); renderSidebar(); },
+        'aria-label': isDark ? 'Switch to light mode' : 'Switch to dark mode',
+    }, navIcon(isDark ? 'sun' : 'moon'), isDark ? 'Light mode' : 'Dark mode');
     const logoutLink = el('a', { href: '#', onclick: logout }, navIcon('logout'), 'Log out');
     logoutLink.addEventListener('click', closeSidebar);
-    const sidebarFooter = el('div', { class: 'sidebar-footer' }, userLabel, logoutLink);
+    const sidebarFooter = el('div', { class: 'sidebar-footer' }, userLabel, themeToggle, logoutLink);
 
     sidebar.replaceChildren(brand, navLinks, sidebarFooter);
 }
