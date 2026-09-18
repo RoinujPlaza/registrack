@@ -194,6 +194,31 @@ body:not(.login-mode) {
 .card h1, .card h2 { margin-top: 0; font-size: 1.15rem; }
 .muted { color: var(--gray); font-size: 0.9rem; }
 
+/* Student request detail — back button + organized layout */
+.back-btn {
+    display: inline-flex; align-items: center; gap: 0.4rem;
+    background: #fff; border: 1px solid #e6ebe6; border-radius: 999px;
+    padding: 0.5rem 1.1rem; font-size: 0.88rem; font-weight: 600;
+    color: var(--text); text-decoration: none;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    transition: all 0.15s ease;
+    width: fit-content;
+}
+.back-btn:hover { background: #f1f5f1; border-color: #d1ddd1; transform: translateX(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.06); }
+.request-card { padding: 1.5rem; }
+.request-header {
+    display: flex; justify-content: space-between; align-items: flex-start;
+    gap: 1rem; margin-bottom: 1.25rem; flex-wrap: wrap;
+    border-bottom: 1px solid #eef2ee; padding-bottom: 1rem;
+}
+.request-header h1 { font-size: 1.3rem; margin: 0; letter-spacing: -0.02em; color: var(--text); }
+.detail-grid { display: grid; gap: 1.1rem; grid-template-columns: 1fr 1fr; margin-bottom: 0.5rem; }
+.detail-field { display: flex; flex-direction: column; gap: 0.25rem; }
+.detail-label { font-size: 0.7rem; font-weight: 700; color: var(--gray); text-transform: uppercase; letter-spacing: 0.05em; }
+.detail-value { margin: 0; font-size: 0.93rem; line-height: 1.5; color: var(--text); }
+.detail-value.muted { color: var(--gray); font-size: 0.85rem; }
+@media (max-width: 640px) { .detail-grid { grid-template-columns: 1fr; } }
+
 /* Global container spacing — all pages (student, staff, reports, notif, admin) — prevent nagtapad / singkit */
 body:not(.login-mode) .main-content {
     padding: 2rem 2rem 2rem 2rem !important;
@@ -340,18 +365,35 @@ tr.clickable:hover { transform: translateY(-1px); box-shadow: 0 4px 10px rgba(0,
 }
 .timeline .when { color: var(--gray); font-size: 0.82rem; }
 
-/* Notifications — separated cards (each notif divided by a line) */
+/* Notifications — soft pills with icons */
 .notif-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.75rem; }
 .notif-item {
-    background: #fff;
-    border: 1px solid var(--border);
-    border-left: 4px solid var(--green);
-    border-radius: 10px;
-    padding: 0.9rem 1rem;
+    background: #fafcfa;
+    border: 1px solid #eef2ee;
+    border-radius: 16px;
+    padding: 1rem 1.05rem;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    display: flex; flex-direction: column; gap: 0.42rem;
+    transition: transform 0.12s, box-shadow 0.12s;
 }
-.notif-head { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; font-size: 0.95rem; }
+.notif-item:hover { transform: translateY(-1px); box-shadow: 0 4px 10px rgba(0,0,0,0.06); }
+.notif-head { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; font-size: 0.95rem; }
 .notif-head .badge { margin-left: 0; }
-.badge-new { background: var(--green); color: #fff; }
+.badge-new { background: var(--green); color: #fff; border-radius: 999px; padding: 0.15rem 0.6rem; font-size: 0.72rem; font-weight: 700; }
+.notif-icon {
+    width: 32px; height: 32px; border-radius: 999px;
+    background: #e8f5e9; border: 1px solid #d6e8d6;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.notif-icon svg { width: 16px; height: 16px; color: var(--green-dark); }
+.audit-pill {
+    display: inline-flex; align-items: center; gap: 4px;
+    background: #f1f5f1; border: 1px solid #e2e8e2;
+    border-radius: 999px; padding: 0.22rem 0.62rem;
+    font-size: 0.78rem; font-weight: 600; color: var(--text); white-space: nowrap;
+}
+.audit-pill svg { width: 12px; height: 12px; flex-shrink: 0; }
+.audit-pills { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .notif-body { margin: 0.4rem 0 0.3rem; line-height: 1.5; color: var(--text); font-size: 0.92rem; }
 .notif-item .when { color: var(--gray); font-size: 0.82rem; margin-bottom: 0.5rem; }
 
@@ -592,6 +634,13 @@ body:has(.shell:has(.sidebar.hidden)) {
 [data-theme="dark"] .filters select { background: #1e2623; border-color: var(--border); color: var(--text); }
 [data-theme="dark"] .soft-table thead th { color: var(--gray); }
 [data-theme="dark"] .soft-table tbody tr { background: #1e2623; border-color: var(--border); }
+[data-theme="dark"] .back-btn { background: #252e2b; border-color: var(--border); color: var(--text); }
+[data-theme="dark"] .back-btn:hover { background: #2e3835; }
+[data-theme="dark"] .request-header { border-bottom-color: var(--border); }
+[data-theme="dark"] .notif-item { background: var(--card); border-color: var(--border); }
+[data-theme="dark"] .notif-icon { background: #1e2623; border-color: var(--border); }
+[data-theme="dark"] .notif-icon svg { color: var(--text); }
+[data-theme="dark"] .audit-pill { background: #252e2b; border-color: var(--border); color: var(--text); }
 [data-theme="dark"] .pill { background: #252e2b; border-color: var(--border); color: var(--text); }
 [data-theme="dark"] .pill.active { background: var(--green); color: #fff; }
 [data-theme="dark"] .report-toolbar input,

@@ -128,7 +128,11 @@ async function api(path, { method = 'GET', body, headers = {} } = {}) {
 
 /* --- Shared UI pieces ---------------------------------------------------- */
 function statusBadge(status) {
-    return el('span', { class: `badge-status st-${status}`, text: STATUS_LABELS[status] || status });
+    const badge = document.createElement('span');
+    badge.className = `badge-status st-${status}`;
+    if (STATUS_ICONS[status]) badge.appendChild(statusIcon(status));
+    badge.appendChild(document.createTextNode(STATUS_LABELS[status] || status));
+    return badge;
 }
 
 function fmtDateTime(value) {
@@ -174,6 +178,52 @@ function navIcon(name) {
     svg.setAttribute('stroke-linejoin', 'round');
     svg.setAttribute('aria-hidden', 'true');
     svg.innerHTML = NAV_ICONS[name] || '';
+    return svg;
+}
+
+const STATUS_ICONS = {
+    pending: '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',
+    needs_information: '<circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/>',
+    in_process: '<path d="M21 12a9 9 0 1 1-9-9"/><line x1="12" y1="7" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>',
+    ready_for_release: '<path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16l4-2 4 2z"/>',
+    released: '<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>',
+    rejected: '<circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>',
+    cancelled: '<circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/>',
+};
+
+function statusIcon(status) {
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('class', 'status-icon');
+    svg.setAttribute('viewBox', '0 0 24 24');
+    svg.setAttribute('fill', 'none');
+    svg.setAttribute('stroke', 'currentColor');
+    svg.setAttribute('stroke-width', '2');
+    svg.setAttribute('stroke-linecap', 'round');
+    svg.setAttribute('stroke-linejoin', 'round');
+    svg.setAttribute('aria-hidden', 'true');
+    svg.style.width = '13px';
+    svg.style.height = '13px';
+    svg.style.marginRight = '4px';
+    svg.style.verticalAlign = '-2px';
+    svg.innerHTML = STATUS_ICONS[status] || '';
+    return svg;
+}
+
+function arrowIcon() {
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('viewBox', '0 0 24 24');
+    svg.setAttribute('fill', 'none');
+    svg.setAttribute('stroke', 'currentColor');
+    svg.setAttribute('stroke-width', '2');
+    svg.setAttribute('stroke-linecap', 'round');
+    svg.setAttribute('stroke-linejoin', 'round');
+    svg.setAttribute('aria-hidden', 'true');
+    svg.style.width = '14px';
+    svg.style.height = '14px';
+    svg.style.margin = '0 6px';
+    svg.style.verticalAlign = '-2px';
+    svg.style.opacity = '0.6';
+    svg.innerHTML = '<line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>';
     return svg;
 }
 
@@ -469,7 +519,7 @@ async function viewStudentRequest(trackingNumber) {
     try {
         detail = await api(`/api/v1/requests/mine/${encodeURIComponent(trackingNumber)}`);
     } catch (err) {
-        app.replaceChildren(messageBox('form-error', err.message), el('p', {}, el('a', { href: '#/student', text: '← Back to my requests' })));
+        app.replaceChildren(messageBox('form-error', err.message), el('a', { class: 'back-btn', href: '#/student', text: '← Back to my requests' }));
         return;
     }
 
@@ -493,15 +543,41 @@ async function viewStudentRequest(trackingNumber) {
         },
     });
 
+    const backBtn = el('a', { class: 'back-btn', href: '#/student', text: '← Back to my requests' });
+
+    const header = el('div', { class: 'request-header' },
+        el('div', {},
+            el('h1', { text: request.tracking_number }),
+            el('div', { class: 'muted', text: `${request.document_type_name} × ${request.quantity}` }),
+        ),
+        statusBadge(request.status),
+    );
+
+    const details = el('div', { class: 'detail-grid' },
+        el('div', { class: 'detail-field' },
+            el('span', { class: 'detail-label', text: 'Purpose' }),
+            el('p', { class: 'detail-value', text: request.purpose }),
+        ),
+        el('div', { class: 'detail-field' },
+            el('span', { class: 'detail-label', text: 'Submitted' }),
+            el('p', { class: 'detail-value muted', text: fmtDateTime(request.submitted_at) }),
+        ),
+        el('div', { class: 'detail-field' },
+            el('span', { class: 'detail-label', text: 'Requested release' }),
+            el('p', { class: 'detail-value muted', text: fmtDate(request.target_release_date) }),
+        ),
+        request.current_remark ? el('div', { class: 'detail-field' },
+            el('span', { class: 'detail-label', text: 'Latest remark' }),
+            el('p', { class: 'detail-value', text: request.current_remark }),
+        ) : null,
+    );
+
     setChildren(app,
-        el('p', {}, el('a', { href: '#/student', text: '← Back to my requests' })),
-        el('div', { class: 'card' },
-            el('h1', { text: request.tracking_number }, ' ', statusBadge(request.status)),
-            el('p', {}, el('strong', { text: request.document_type_name }), ` × ${request.quantity}`),
-            el('p', { text: `Purpose: ${request.purpose}` }),
-            el('p', { class: 'muted', text: `Submitted ${fmtDateTime(request.submitted_at)} · Requested release ${fmtDate(request.target_release_date)}` }),
-            request.current_remark ? el('p', { text: `Latest remark: ${request.current_remark}` }) : null,
-            request.status === 'pending' ? el('div', { class: 'actions' }, cancelButton) : null,
+        backBtn,
+        el('div', { class: 'card request-card' },
+            header,
+            details,
+            request.status === 'pending' ? el('div', { class: 'actions', style: 'margin-top:1.1rem;' }, cancelButton) : null,
             cancelSlot,
         ),
         historyCard(detail.data.history),
@@ -510,8 +586,11 @@ async function viewStudentRequest(trackingNumber) {
 
 function historyCard(history) {
     const items = (history || []).map((h) => el('li', {},
-        el('div', {}, statusBadge(h.new_status), ` ${h.prev_status ? `(${STATUS_LABELS[h.prev_status] || h.prev_status} →)` : '(submitted)'}`),
-        h.remark ? el('div', { text: h.remark }) : null,
+        el('div', { style: 'display:flex; align-items:center; gap:6px;' },
+            statusBadge(h.new_status),
+            !h.prev_status ? el('span', { class: 'muted', text: '(submitted)', style: 'font-size:0.82rem;' }) : null
+        ),
+        h.remark ? el('div', { text: h.remark, style: 'margin-top:4px;' }) : null,
         el('div', { class: 'when', text: `${fmtDateTime(h.created_at)} — ${h.actor_name} (${h.actor_role})` }),
     ));
     return el('div', { class: 'card' },
@@ -577,7 +656,7 @@ async function viewStaffRequest(requestId) {
     try {
         detail = await api(`/api/v1/requests/${requestId}`);
     } catch (err) {
-        app.replaceChildren(messageBox('form-error', err.message), el('p', {}, el('a', { href: '#/staff', text: '← Back to queue' })));
+        app.replaceChildren(messageBox('form-error', err.message), el('a', { class: 'back-btn', href: '#/staff', text: '← Back to queue' }));
         return;
     }
 
@@ -590,16 +669,43 @@ async function viewStaffRequest(requestId) {
             onclick: () => renderTransitionForm(actionSlot, request, to, reasonRequired),
         }));
 
+    const backBtn = el('a', { class: 'back-btn', href: '#/staff', text: '← Back to queue' });
+    const header = el('div', { class: 'request-header' },
+        el('div', {},
+            el('h1', { text: request.tracking_number }),
+            el('div', { class: 'muted', text: `${request.document_type_name} × ${request.quantity}` }),
+        ),
+        statusBadge(request.status),
+    );
+    const details = el('div', { class: 'detail-grid' },
+        el('div', { class: 'detail-field' },
+            el('span', { class: 'detail-label', text: 'Student' }),
+            el('p', { class: 'detail-value', text: `${request.student_name} (${request.student_number || 'no student number'})` }),
+        ),
+        el('div', { class: 'detail-field' },
+            el('span', { class: 'detail-label', text: 'Purpose' }),
+            el('p', { class: 'detail-value', text: request.purpose }),
+        ),
+        el('div', { class: 'detail-field' },
+            el('span', { class: 'detail-label', text: 'Submitted' }),
+            el('p', { class: 'detail-value muted', text: fmtDateTime(request.submitted_at) }),
+        ),
+        el('div', { class: 'detail-field' },
+            el('span', { class: 'detail-label', text: 'Target release' }),
+            el('p', { class: 'detail-value muted', text: fmtDate(request.target_release_date) }),
+        ),
+        request.current_remark ? el('div', { class: 'detail-field' },
+            el('span', { class: 'detail-label', text: 'Latest remark' }),
+            el('p', { class: 'detail-value', text: request.current_remark }),
+        ) : null,
+    );
+
     setChildren(app,
-        el('p', {}, el('a', { href: '#/staff', text: '← Back to queue' })),
-        el('div', { class: 'card' },
-            el('h1', { text: request.tracking_number }, ' ', statusBadge(request.status)),
-            el('p', {}, el('strong', { text: request.student_name }), ` (${request.student_number || 'no student number'})`),
-            el('p', {}, el('strong', { text: request.document_type_name }), ` × ${request.quantity}`),
-            el('p', { text: `Purpose: ${request.purpose}` }),
-            el('p', { class: 'muted', text: `Submitted ${fmtDateTime(request.submitted_at)} · Target release ${fmtDate(request.target_release_date)}` }),
-            request.current_remark ? el('p', { text: `Latest remark: ${request.current_remark}` }) : null,
-            el('div', { class: 'actions' }, transitionButtons),
+        backBtn,
+        el('div', { class: 'card request-card' },
+            header,
+            details,
+            el('div', { class: 'actions', style: 'margin-top:1.1rem;' }, transitionButtons),
             actionSlot,
         ),
         historyCard(history),
@@ -637,14 +743,54 @@ function renderTransitionForm(slot, request, toStatus, reasonRequired) {
     ));
 }
 
+function auditChangeEl(a) {
+    try {
+        if (a.before_value && a.after_value) {
+            const b = JSON.parse(a.before_value);
+            const af = JSON.parse(a.after_value);
+            if (b && af && b.status && af.status) {
+                const wrap = el('span', { style: 'display:inline-flex; align-items:center; gap:8px;' });
+                wrap.appendChild(statusBadge(b.status));
+                wrap.appendChild(statusBadge(af.status));
+                return wrap;
+            }
+        }
+        if (a.after_value) {
+            try {
+                const af = JSON.parse(a.after_value);
+                if (af && af.tracking_number) {
+                    const wrap = el('span', { class: 'audit-pills' });
+                    const makePill = (icon, text) => {
+                        const p = el('span', { class: 'audit-pill' });
+                        const ic = navIcon(icon);
+                        ic.style.width = '12px'; ic.style.height = '12px'; ic.style.marginRight = '0';
+                        p.appendChild(ic);
+                        p.appendChild(document.createTextNode(' ' + text));
+                        return p;
+                    };
+                    wrap.appendChild(makePill('requests', af.tracking_number));
+                    const docName = af.document_type_name || af.document_type || '';
+                    if (docName) wrap.appendChild(makePill('reports', String(docName)));
+                    if (af.quantity != null && af.quantity !== '') wrap.appendChild(makePill('users', '×' + String(af.quantity)));
+                    if (af.target_release_date) wrap.appendChild(makePill('bell', String(af.target_release_date)));
+                    return wrap;
+                }
+            } catch {}
+        }
+    } catch {}
+    const raw = a.before_value && a.after_value
+        ? `${shortJson(a.before_value)} → ${shortJson(a.after_value)}`
+        : (shortJson(a.after_value) || '—');
+    const clean = raw.replace(/status=/g, '').replace(/ → /g, '  ');
+    return el('span', { text: clean });
+}
+
 function auditCard(audit) {
     const rows = (audit || []).map((a) => el('tr', {},
         el('td', { 'data-label': 'When', text: fmtDateTime(a.created_at) }),
         el('td', { 'data-label': 'Actor', text: `${a.actor_name} (${a.actor_role})` }),
         el('td', { 'data-label': 'Action', text: a.action }),
-        el('td', { 'data-label': 'Change', text: a.before_value && a.after_value
-            ? `${shortJson(a.before_value)} → ${shortJson(a.after_value)}`
-            : (shortJson(a.after_value) || '—') }),
+        el('td', { 'data-label': 'Change' }, auditChangeEl(a)),
     ));
     return el('div', { class: 'card' },
         el('h2', { text: 'Audit trail (immutable)' }),
@@ -678,7 +824,11 @@ async function viewNotifications() {
     }
 
     const items = result.data.items.map((n) => el('li', { class: 'notif-item' },
-        el('div', { class: 'notif-head' }, el('strong', { text: n.subject }), n.read_at ? null : el('span', { class: 'badge badge-new', text: 'new' })),
+        el('div', { class: 'notif-head' },
+            el('span', { class: 'notif-icon' }, navIcon('bell')),
+            el('strong', { text: n.subject }),
+            n.read_at ? null : el('span', { class: 'badge badge-new', text: 'new' })
+        ),
         el('div', { class: 'notif-body', text: n.body }),
         el('div', { class: 'when', text: fmtDateTime(n.created_at) }),
         n.read_at ? null : el('button', {
