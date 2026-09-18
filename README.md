@@ -209,6 +209,4 @@ Base: `/api/v1` — JSON, `X-CSRF-Token` required for non-GET when authenticated
 * App icon: [“Checklist” by Magnific](https://www.flaticon.com/free-icon/checklist_2666469) via Flaticon — free with attribution.
 * TCGC background: `public/assets/background.jpg` — Tangub City Global College.
 
-## License
 
-MIT — see `LICENSE` (add if needed). For academic use at TCGC.
