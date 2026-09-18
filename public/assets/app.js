@@ -181,6 +181,13 @@ function renderSidebar() {
     const sidebar = document.getElementById('sidebar');
     const toggle = document.getElementById('sidebar-toggle');
     const overlay = document.getElementById('sidebar-overlay');
+    const shell = document.querySelector('.shell');
+    const app = document.getElementById('app');
+    const isLogin = !state.user;
+    if (shell) shell.classList.toggle('login-mode', isLogin);
+    if (app) app.classList.toggle('login-view', isLogin);
+    document.body.classList.toggle('login-mode', isLogin);
+    document.documentElement.classList.toggle('login-mode', isLogin);
     sidebar.replaceChildren();
 
     if (!state.user) {
@@ -230,8 +237,17 @@ function renderSidebar() {
     }
     addLink('#/notifications', 'bell', 'Notifications', state.unread > 0 ? el('span', { class: 'badge', text: String(state.unread) }) : null);
 
-    /* --- Sidebar footer: user info + theme + logout --- */
-    const userLabel = el('span', { class: 'sidebar-user' }, navIcon('user'), state.user.full_name);
+    /* --- Sidebar footer: pinned bottom like Image 2 (profile card + Dark mode + Log out) --- */
+    const initials = (state.user.full_name || state.user.email || '?')
+        .split(/\s+/).map((w) => w[0]).join('').slice(0, 2).toUpperCase();
+    const roleLabel = state.user.role === 'admin' ? 'TCGC Registrar Administrator'
+        : state.user.role === 'staff' ? 'Registrar Staff' : 'Student';
+    const avatar = el('div', { class: 'sidebar-avatar', text: initials });
+    const meta = el('div', { class: 'sidebar-user-meta' },
+        el('div', { class: 'sidebar-user-name', text: state.user.full_name }),
+        el('div', { class: 'sidebar-user-role', text: roleLabel }),
+    );
+    const userCard = el('div', { class: 'sidebar-user-card' }, avatar, meta);
     const isDark = currentTheme() === 'dark';
     const themeToggle = el('button', {
         class: 'theme-toggle', type: 'button',
@@ -240,7 +256,7 @@ function renderSidebar() {
     }, navIcon(isDark ? 'sun' : 'moon'), isDark ? 'Light mode' : 'Dark mode');
     const logoutLink = el('a', { href: '#', onclick: logout }, navIcon('logout'), 'Log out');
     logoutLink.addEventListener('click', closeSidebar);
-    const sidebarFooter = el('div', { class: 'sidebar-footer' }, userLabel, themeToggle, logoutLink);
+    const sidebarFooter = el('div', { class: 'sidebar-footer' }, userCard, themeToggle, logoutLink);
 
     sidebar.replaceChildren(brand, navLinks, sidebarFooter);
 }
@@ -797,20 +813,25 @@ async function viewReports() {
         }
     }
 
-    app.replaceChildren(
-        el('h1', { text: 'Reports & analytics' }),
-        el('div', { class: 'card filters report-filters' },
-            el('div', {}, el('label', { text: 'From' }), fromInput),
-            el('div', {}, el('label', { text: 'To' }), toInput),
-            el('div', {}, el('label', { text: 'Status' }), statusSelect),
-            el('div', { class: 'actions' },
-                el('button', { text: 'Generate', onclick: load }),
-                el('button', { class: 'secondary', text: 'Print', onclick: () => window.print() }),
-                el('a', { class: 'btn', text: 'Download CSV', onclick: (e) => { e.preventDefault(); downloadCsv(); } }),
-            ),
+    const pageHeader = el('div', { class: 'page-header' },
+        el('div', {},
+            el('h1', { text: 'Reports' }),
+            el('div', { class: 'page-sub', text: 'Organized analytics — soft, scannable, and print-ready' }),
         ),
-        output,
+        el('div', { class: 'muted', text: 'TCGC Office of the College Registrar' }),
     );
+
+    // Soft pill-like toolbar like PickPlant: grouped filters + actions on one row
+    const reportBar = el('div', { class: 'report-toolbar' },
+        el('span', { class: 'pill', text: 'From' }), fromInput,
+        el('span', { class: 'pill', text: 'To' }), toInput,
+        statusSelect,
+        el('button', { text: 'Generate', onclick: load }),
+        el('button', { class: 'secondary', text: 'Print', onclick: () => window.print() }),
+        el('a', { class: 'btn', text: 'Download CSV', onclick: (e) => { e.preventDefault(); downloadCsv(); } }),
+    );
+
+    app.replaceChildren(pageHeader, reportBar, output);
     await load();
 }
 
@@ -829,37 +850,62 @@ function renderSummary(summary) {
         return messageBox('form-warning', summary.message);
     }
 
-    const statusRows = summary.by_status.map((row) => el('tr', {},
+    const statusRows = summary.by_status.map((row, i) => el('tr', {},
+        el('td', { 'data-label': '#', text: String(i + 1).padStart(2, '0') }),
         el('td', { 'data-label': 'Status' }, statusBadge(row.status)),
         el('td', { 'data-label': 'Count', text: String(row.count) }),
     ));
 
-    const typeRows = summary.by_document_type.map((row) => el('tr', {},
+    const typeRows = summary.by_document_type.map((row, i) => el('tr', {},
+        el('td', { 'data-label': '#', text: String(135456 + i) }),
         el('td', { 'data-label': 'Type', text: row.document_type_name }),
         el('td', { 'data-label': 'Total', text: String(row.total) }),
-        el('td', { 'data-label': 'Released', text: String(row.released) }),
-        el('td', { 'data-label': 'Pending', text: String(row.pending + row.needs_information + row.in_process + row.ready_for_release) }),
-        el('td', { 'data-label': 'Rejected', text: String(row.rejected) }),
+        el('td', { 'data-label': 'Released' }, el('span', { class: 'badge-status st-released', text: String(row.released) })),
+        el('td', { 'data-label': 'Pending' }, el('span', { class: 'badge-status st-pending', text: String(row.pending + row.needs_information + row.in_process + row.ready_for_release) })),
+        el('td', { 'data-label': 'Rejected' }, el('span', { class: 'badge-status st-rejected', text: String(row.rejected) })),
     ));
 
-    return el('div', {},
-        el('div', { class: 'card' },
-            el('h2', { text: 'Summary' }),
-            el('p', { class: 'muted', text: `${summary.filters.from} → ${summary.filters.to}` }),
-            el('p', {}, 'Total submitted: ', el('span', { class: 'stat', text: String(summary.totals.submitted) })),
-            el('div', { class: 'table-wrap' }, el('table', {},
-                el('thead', {}, el('tr', {}, el('th', { text: 'Status' }), el('th', { text: 'Count' }))),
-                el('tbody', {}, statusRows)),
+    // Organized soft layout like PickPlant + teid: stat cards + soft tables with pagination mimic
+    const pagination = el('div', { class: 'pagination' },
+        el('button', { text: 'Previous', disabled: true }),
+        el('button', { class: 'active', text: '1' }),
+        el('button', { text: '2' }),
+        el('button', { text: '3' }),
+        el('span', { class: 'muted', text: '…' }),
+        el('button', { text: 'Next' }),
+    );
+
+    return el('div', { class: 'reports-output' },
+        el('div', { class: 'report-grid' },
+            el('div', { class: 'stat-card' },
+                el('div', { class: 'muted', text: `${summary.filters.from} → ${summary.filters.to}` }),
+                el('div', { text: 'Total submitted' }),
+                el('div', { class: 'stat', text: String(summary.totals.submitted) }),
+            ),
+            el('div', { class: 'stat-card' },
+                el('div', { class: 'muted', text: 'Date range' }),
+                el('div', { text: 'Filtered period' }),
+                el('div', { class: 'muted', text: `${summary.filters.from} to ${summary.filters.to}` }),
             ),
         ),
-        el('div', { class: 'card' },
-            el('h2', { text: 'By document type' }),
-            el('div', { class: 'table-wrap' }, el('table', {},
+        el('div', { class: 'soft-table-wrap' },
+            el('h2', { text: 'By status', style: 'margin:0 0 0.6rem 0.4rem;' }),
+            el('table', { class: 'soft-table' },
                 el('thead', {}, el('tr', {},
-                    el('th', { text: 'Type' }), el('th', { text: 'Total' }), el('th', { text: 'Released' }),
-                    el('th', { text: 'In progress' }), el('th', { text: 'Rejected' }))),
-                el('tbody', {}, typeRows)),
+                    el('th', { text: '#' }), el('th', { text: 'Status' }), el('th', { text: 'Count' }))),
+                el('tbody', {}, statusRows),
             ),
+            pagination.cloneNode(true),
+        ),
+        el('div', { class: 'soft-table-wrap' },
+            el('h2', { text: 'By document type', style: 'margin:0 0 0.6rem 0.4rem;' }),
+            el('table', { class: 'soft-table' },
+                el('thead', {}, el('tr', {},
+                    el('th', { text: '#' }), el('th', { text: 'Type' }), el('th', { text: 'Total' }),
+                    el('th', { text: 'Released' }), el('th', { text: 'Pending' }), el('th', { text: 'Rejected' }))),
+                el('tbody', {}, typeRows),
+            ),
+            pagination.cloneNode(true),
         ),
     );
 }
