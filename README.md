@@ -2,7 +2,7 @@
 
 > Web-based registrar transaction tracking for **Tangub City Global College — Office of the College Registrar**. Students submit academic document requests and track them in real time; registrar staff process them through a server-enforced workflow. Every action is captured in an **append-only audit trail**.
 
-![PHP](https://img.shields.io/badge/PHP-8.x-777BB4?logo=php&logoColor=white) ![MySQL](https://img.shields.io/badge/MySQL%20%7C%20MariaDB-4479A1?logo=mysql&logoColor=white) ![Vanilla JS](https://img.shields.io/badge/Frontend-Vanilla%20JS%20SPA-F7DF1E?logo=javascript&logoColor=black) ![License](https://img.shields.io/badge/license-MIT-green)
+![PHP](https://img.shields.io/badge/PHP-8.x-777BB4?logo=php&logoColor=white) ![MySQL](https://img.shields.io/badge/MySQL%20%7C%20MariaDB-4479A1?logo=mysql&logoColor=white) ![Vanilla JS](https://img.shields.io/badge/Frontend-Vanilla%20JS%20SPA-F7DF1E?logo=javascript&logoColor=black) 
 
 **Live repo:** `github.com/RoinujPlaza/registrack` • **Spec source:** `Registrack-Jumawan.docx` • **Decisions:** [`DECISIONS.md`](./DECISIONS.md)
 
