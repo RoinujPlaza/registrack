@@ -35,16 +35,50 @@ CREATE TABLE users (
 ) ENGINE = InnoDB;
 
 -- -----------------------------------------------------------------------------
--- Document type catalogue (admin-configurable)
+-- Document type catalogue (admin-configurable) + issuance policy
+-- catalog_group drives the student picker (student/graduate also include 'both');
+-- item_type distinguishes quantity-bearing documents from CAV/registrar services.
+-- issuance_policy controls how often one student may receive the document:
+--   unlimited / once_per_semester / once_per_school_year / once_ever
 -- -----------------------------------------------------------------------------
 CREATE TABLE document_types (
-    id          INT UNSIGNED  NOT NULL AUTO_INCREMENT,
-    name        VARCHAR(120)  NOT NULL,
-    description VARCHAR(500)  NULL,
-    is_active   TINYINT(1)    NOT NULL DEFAULT 1,
-    created_at  TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    id              INT UNSIGNED  NOT NULL AUTO_INCREMENT,
+    name            VARCHAR(120)  NOT NULL,
+    description     VARCHAR(500)  NULL,
+    catalog_group   ENUM('student','graduate','both','cav','other')
+                    NOT NULL DEFAULT 'student',
+    item_type       ENUM('document','service') NOT NULL DEFAULT 'document',
+    issuance_policy ENUM('unlimited','once_per_semester','once_per_school_year','once_ever')
+                    NOT NULL DEFAULT 'unlimited',
+    policy_note     VARCHAR(255)  NULL,
+    instructions    VARCHAR(500)  NULL,
+    sort_order      INT           NOT NULL DEFAULT 0,
+    is_active       TINYINT(1)    NOT NULL DEFAULT 1,
+    created_at      TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
-    CONSTRAINT uq_document_types_name UNIQUE (name)
+    CONSTRAINT uq_document_types_name UNIQUE (name),
+    INDEX idx_document_types_catalog (is_active, catalog_group, sort_order)
+) ENGINE = InnoDB;
+
+-- -----------------------------------------------------------------------------
+-- Academic terms (school year + semester). Requests are stamped with the term
+-- active at submission so once-per-semester rules remain stable even if the
+-- registrar corrects term dates later.
+-- -----------------------------------------------------------------------------
+CREATE TABLE academic_terms (
+    id          INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    school_year VARCHAR(9)   NOT NULL,                 -- e.g. 2026-2027
+    semester    ENUM('first','second','summer') NOT NULL,
+    starts_on   DATE         NOT NULL,
+    ends_on     DATE         NOT NULL,
+    is_current  TINYINT(1)   NOT NULL DEFAULT 0,
+    created_at  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    CONSTRAINT uq_academic_terms_period UNIQUE (school_year, semester),
+    CONSTRAINT chk_academic_terms_dates CHECK (ends_on > starts_on),
+    INDEX idx_academic_terms_dates (starts_on, ends_on),
+    INDEX idx_academic_terms_current (is_current)
 ) ENGINE = InnoDB;
 
 -- -----------------------------------------------------------------------------
@@ -56,6 +90,7 @@ CREATE TABLE requests (
     tracking_number     VARCHAR(20)     NOT NULL,                 -- RT-YYYYMMDD-XXXXXX
     student_id          INT UNSIGNED    NOT NULL,
     document_type_id    INT UNSIGNED    NOT NULL,
+    term_id             INT UNSIGNED    NULL,                     -- academic term at submission
     quantity            SMALLINT UNSIGNED NOT NULL,
     purpose             VARCHAR(500)    NOT NULL,
     target_release_date DATE            NOT NULL,
@@ -73,11 +108,13 @@ CREATE TABLE requests (
     CONSTRAINT uq_requests_idempotency UNIQUE (student_id, idempotency_key),
     CONSTRAINT fk_requests_student      FOREIGN KEY (student_id)       REFERENCES users(id),
     CONSTRAINT fk_requests_doc_type     FOREIGN KEY (document_type_id) REFERENCES document_types(id),
+    CONSTRAINT fk_requests_term         FOREIGN KEY (term_id)          REFERENCES academic_terms(id),
     CONSTRAINT fk_requests_assigned_to  FOREIGN KEY (assigned_to)      REFERENCES users(id),
     CONSTRAINT chk_requests_quantity CHECK (quantity > 0),
     INDEX idx_requests_status_submitted (status, submitted_at),
     INDEX idx_requests_student (student_id),
     INDEX idx_requests_doc_type (document_type_id),
+    INDEX idx_requests_term (term_id),
     INDEX idx_requests_target_date (target_release_date)
 ) ENGINE = InnoDB;
 

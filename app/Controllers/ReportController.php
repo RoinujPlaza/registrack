@@ -6,6 +6,7 @@ namespace RegisTrack\Controllers;
 
 use RegisTrack\Core\Auth;
 use RegisTrack\Core\Http;
+use RegisTrack\Core\Time;
 use RegisTrack\Services\AuditService;
 use RegisTrack\Services\ReportService;
 
@@ -38,7 +39,7 @@ final class ReportController
                 'format' => 'csv',
                 'filters' => $result['summary']['filters'],
             ]);
-            Http::csv($result['csv'], 'registrack-report-' . gmdate('Ymd-His') . '.csv');
+            Http::csv($result['csv'], 'registrack-report-' . Time::manilaNow()->format('Ymd-His') . '.csv');
             return;
         }
 

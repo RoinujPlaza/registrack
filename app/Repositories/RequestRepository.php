@@ -7,6 +7,7 @@ namespace RegisTrack\Repositories;
 use PDO;
 use PDOStatement;
 use RegisTrack\Core\AppContext;
+use RegisTrack\Core\Time;
 
 /**
  * All SQL for document requests, their processing history, and the
@@ -26,6 +27,7 @@ final class RequestRepository
     {
         $statement = $this->db->prepare(
             'SELECT r.*, t.name AS document_type_name,
+                    t.issuance_policy, t.policy_note, t.catalog_group, t.item_type,
                     s.full_name AS student_name, s.student_number AS student_number
              FROM requests r
              JOIN document_types t ON t.id = r.document_type_id
@@ -41,7 +43,7 @@ final class RequestRepository
     public function findByTrackingNumber(string $trackingNumber): ?array
     {
         $statement = $this->db->prepare(
-            'SELECT r.*, t.name AS document_type_name
+            'SELECT r.*, t.name AS document_type_name, t.catalog_group, t.item_type
              FROM requests r
              JOIN document_types t ON t.id = r.document_type_id
              WHERE r.tracking_number = ?
@@ -56,7 +58,7 @@ final class RequestRepository
     public function findByTrackingForStudent(string $trackingNumber, int $studentId): ?array
     {
         $statement = $this->db->prepare(
-            'SELECT r.*, t.name AS document_type_name
+            'SELECT r.*, t.name AS document_type_name, t.catalog_group, t.item_type
              FROM requests r
              JOIN document_types t ON t.id = r.document_type_id
              WHERE r.tracking_number = ? AND r.student_id = ?
@@ -71,7 +73,7 @@ final class RequestRepository
     public function findIdempotent(int $studentId, string $idempotencyKey): ?array
     {
         $statement = $this->db->prepare(
-            'SELECT r.*, t.name AS document_type_name
+            'SELECT r.*, t.name AS document_type_name, t.catalog_group, t.item_type
              FROM requests r
              JOIN document_types t ON t.id = r.document_type_id
              WHERE r.student_id = ? AND r.idempotency_key = ?
@@ -89,7 +91,7 @@ final class RequestRepository
     public function duplicateWithinWindow(int $studentId, int $documentTypeId, int $windowDays): ?array
     {
         $statement = $this->db->prepare(
-            "SELECT tracking_number, DATE(submitted_at) AS submitted_date
+            "SELECT tracking_number, DATE(CONVERT_TZ(submitted_at, '+00:00', '+08:00')) AS submitted_date
              FROM requests
              WHERE student_id = ? AND document_type_id = ?
                AND status NOT IN ('cancelled', 'rejected')
@@ -122,7 +124,7 @@ final class RequestRepository
         $total = (int) $countStatement->fetchColumn();
 
         $listStatement = $this->db->prepare(
-            "SELECT r.*, t.name AS document_type_name
+            "SELECT r.*, t.name AS document_type_name, t.catalog_group, t.item_type
              FROM requests r
              JOIN document_types t ON t.id = r.document_type_id
              $whereSql
@@ -142,14 +144,15 @@ final class RequestRepository
     {
         $statement = $this->db->prepare(
             'INSERT INTO requests
-                (tracking_number, student_id, document_type_id, quantity, purpose,
+                (tracking_number, student_id, document_type_id, term_id, quantity, purpose,
                  target_release_date, idempotency_key)
-             VALUES (?, ?, ?, ?, ?, ?, ?)'
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
         );
         $statement->execute([
             $data['tracking_number'],
             $data['student_id'],
             $data['document_type_id'],
+            $data['term_id'] ?? null,
             $data['quantity'],
             $data['purpose'],
             $data['target_release_date'],
@@ -228,10 +231,21 @@ final class RequestRepository
     }
 
     /**
+     * Staff message to the student without a status change. The message is
+     * surfaced as the request's latest remark and delivered as a notification.
+     */
+    public function updateCurrentRemark(int $requestId, string $remark): void
+    {
+        $statement = $this->db->prepare('UPDATE requests SET current_remark = ? WHERE id = ?');
+        $statement->execute([$remark, $requestId]);
+    }
+
+    /**
      * Paginated staff queue with filters (basis of FR6 search).
-     * Oldest first: the registrar works a FIFO queue.
+     * Newest first so the default queue view is driven by recent activity.
+     * The caller decides how many rows to show; older rows remain searchable.
      *
-     * @param array{status?:string, q?:string, document_type_id?:int, date_from?:string, date_to?:string} $filters
+     * @param array{active_only?:bool, status?:string, q?:string, document_type_id?:int, catalog_group?:string, date_from?:string, date_to?:string} $filters
      * @return array{items: array<int, array>, total: int}
      */
     public function listForStaff(array $filters, int $page, int $pageSize): array
@@ -239,6 +253,9 @@ final class RequestRepository
         $where = [];
         $params = [];
 
+        if (!empty($filters['active_only'])) {
+            $where[] = "r.status IN ('pending', 'needs_information', 'in_process', 'ready_for_release')";
+        }
         if (!empty($filters['status'])) {
             $where[] = 'r.status = ?';
             $params[] = $filters['status'];
@@ -252,13 +269,25 @@ final class RequestRepository
             $where[] = 'r.document_type_id = ?';
             $params[] = $filters['document_type_id'];
         }
+        if (!empty($filters['catalog_group'])) {
+            $group = (string) $filters['catalog_group'];
+            if ($group === 'student' || $group === 'graduate') {
+                $where[] = 't.catalog_group IN (?, ?)';
+                array_push($params, $group, 'both');
+            } else {
+                $where[] = 't.catalog_group = ?';
+                $params[] = $group;
+            }
+        }
         if (!empty($filters['date_from'])) {
+            [$fromUtc] = Time::manilaDayBounds((string) $filters['date_from']);
             $where[] = 'r.submitted_at >= ?';
-            $params[] = $filters['date_from'];
+            $params[] = $fromUtc;
         }
         if (!empty($filters['date_to'])) {
-            $where[] = 'r.submitted_at < DATE_ADD(?, INTERVAL 1 DAY)';
-            $params[] = $filters['date_to'];
+            [, $toUtc] = Time::manilaDayBounds((string) $filters['date_to']);
+            $where[] = 'r.submitted_at < ?';
+            $params[] = $toUtc;
         }
 
         $whereSql = $where === [] ? '' : 'WHERE ' . implode(' AND ', $where);
@@ -266,6 +295,7 @@ final class RequestRepository
         $countStatement = $this->db->prepare(
             "SELECT COUNT(*)
              FROM requests r
+             JOIN document_types t ON t.id = r.document_type_id
              JOIN users s ON s.id = r.student_id
              $whereSql"
         );
@@ -273,20 +303,57 @@ final class RequestRepository
         $total = (int) $countStatement->fetchColumn();
 
         $listStatement = $this->db->prepare(
-            "SELECT r.id, r.tracking_number, r.status, r.quantity, r.purpose,
-                    r.target_release_date, r.current_remark, r.version, r.submitted_at,
-                    t.name AS document_type_name,
+            "SELECT r.id, r.tracking_number, r.document_type_id, r.status, r.quantity, r.purpose,
+                    r.target_release_date, r.current_remark, r.version, r.submitted_at, r.released_at,
+                    t.name AS document_type_name, t.catalog_group, t.item_type,
                     s.full_name AS student_name, s.student_number, s.email AS student_email
              FROM requests r
              JOIN document_types t ON t.id = r.document_type_id
              JOIN users s ON s.id = r.student_id
              $whereSql
-             ORDER BY r.submitted_at ASC, r.id ASC
+             ORDER BY r.submitted_at DESC, r.id DESC
              LIMIT ? OFFSET ?"
         );
         $listStatement->execute(array_merge($params, [$pageSize, ($page - 1) * $pageSize]));
 
         return ['items' => $listStatement->fetchAll(), 'total' => $total];
+    }
+
+    /**
+     * All prior (non-cancelled, non-rejected) requests of one student for one
+     * document type. Used by the issuance-policy check; the current request is
+     * excluded by id.
+     *
+     * @return array<int, array>
+     */
+    public function priorRequestsForPolicy(int $studentId, int $documentTypeId, int $excludeRequestId): array
+    {
+        $statement = $this->db->prepare(
+            "SELECT r.id, r.tracking_number, r.status, r.term_id, r.submitted_at, r.released_at,
+                    t.school_year, t.semester
+             FROM requests r
+             LEFT JOIN academic_terms t ON t.id = r.term_id
+             WHERE r.student_id = ? AND r.document_type_id = ? AND r.id <> ?
+               AND r.status NOT IN ('cancelled', 'rejected')
+             ORDER BY r.submitted_at DESC, r.id DESC"
+        );
+        $statement->execute([$studentId, $documentTypeId, $excludeRequestId]);
+
+        return $statement->fetchAll();
+    }
+
+    /**
+     * Serialize issuance decisions for one student + document type so two
+     * concurrent approvals cannot both pass the once-per-period check.
+     * Must be called inside an open transaction.
+     */
+    public function lockIssuanceScope(int $studentId, int $documentTypeId): void
+    {
+        $statement = $this->db->prepare(
+            'SELECT id FROM requests WHERE student_id = ? AND document_type_id = ? FOR UPDATE'
+        );
+        $statement->execute([$studentId, $documentTypeId]);
+        $statement->fetchAll();
     }
 
     /** @return array|null */

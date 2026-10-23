@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace RegisTrack\Services;
 
+use RegisTrack\Core\Time;
 use RegisTrack\Repositories\ReportRepository;
 
 /**
@@ -21,13 +22,13 @@ final class ReportService
     public static function summary(array $input): array
     {
         $fields = [];
-        $timezone = new \DateTimeZone('UTC');
-        $today = new \DateTime('today', $timezone);
 
-        // Default range: last 30 days including today.
-        // NOTE: compute defaults BEFORE mutating $today — DateTime::modify mutates in place.
-        $defaultTo = $today->format('Y-m-d');
-        $defaultFrom = $today->modify('-29 days')->format('Y-m-d');
+        // Default range: the last 30 Philippine calendar days including today.
+        // The registrar's "today" is Asia/Manila even when the server runs in UTC.
+        $defaultTo = Time::todayManila();
+        $defaultFrom = (new \DateTimeImmutable($defaultTo, Time::manilaZone()))
+            ->modify('-29 days')
+            ->format('Y-m-d');
         $from = isset($input['from']) && $input['from'] !== '' ? (string) $input['from'] : $defaultFrom;
         $to = isset($input['to']) && $input['to'] !== '' ? (string) $input['to'] : $defaultTo;
 

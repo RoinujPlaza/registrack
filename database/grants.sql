@@ -12,6 +12,7 @@ CREATE USER IF NOT EXISTS 'registrack_app'@'localhost' IDENTIFIED BY 'CHANGE_ME_
 
 GRANT SELECT, INSERT, UPDATE ON registrack.users            TO 'registrack_app'@'localhost';
 GRANT SELECT, INSERT, UPDATE ON registrack.document_types   TO 'registrack_app'@'localhost';
+GRANT SELECT, INSERT, UPDATE ON registrack.academic_terms   TO 'registrack_app'@'localhost';
 GRANT SELECT, INSERT, UPDATE ON registrack.requests         TO 'registrack_app'@'localhost';
 GRANT SELECT, INSERT         ON registrack.request_history  TO 'registrack_app'@'localhost';
 GRANT SELECT, INSERT         ON registrack.audit_events     TO 'registrack_app'@'localhost';

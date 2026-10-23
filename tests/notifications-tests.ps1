@@ -58,6 +58,7 @@ try {
         -Body ('{"document_type_id":1,"quantity":1,"purpose":"Notification test request","target_release_date":"' + $targetDate + '"}')
     Assert-Status 'submission created (201)' 201 $submitted
     $requestId = ((($submitted.Body | ConvertFrom-Json).data).request.id)
+    $requestTracking = ((($submitted.Body | ConvertFrom-Json).data).request.tracking_number)
 
     $emailRows = [int] (Invoke-Db "SELECT COUNT(*) FROM notifications WHERE request_id=$requestId AND channel='email';" | Select-Object -Last 1)
     Assert-True 'email rows queued for staff when channel enabled' ($emailRows -eq 2) "got $emailRows"
@@ -76,6 +77,8 @@ try {
     Assert-Status 'student notification list' 200 $panel
     $panelData = ($panel.Body | ConvertFrom-Json).data
     Assert-True 'panel meta carries unread count' ($panelData.meta.unread -ge 1)
+    Assert-True 'notification carries request id for staff link' ($panelData.items[0].request_id -eq $requestId)
+    Assert-True 'notification carries tracking number for student link' ($panelData.items[0].tracking_number -eq $requestTracking)
     $unreadBefore = $panelData.meta.unread
     $firstNotificationId = $panelData.items[0].id
 
@@ -105,6 +108,19 @@ try {
     Assert-Status 'mark read is idempotent (still 200)' 200 $mark2
     Assert-True 'unread unchanged on second mark' `
         ((((($mark2.Body | ConvertFrom-Json).data).unread)) -eq $unreadAfter1)
+
+    # --- Panel auto-read: one call acknowledges every unread notification ----------------
+    $readAll = Invoke-Api -Method 'POST' -Path '/api/v1/notifications/read-all' -CookieJar $jarStudent `
+        -Headers @{ 'X-CSRF-Token' = $csrfStudent }
+    Assert-Status 'mark all read succeeds' 200 $readAll
+    Assert-True 'mark all read clears the unread count' `
+        ((((($readAll.Body | ConvertFrom-Json).data).unread)) -eq 0)
+
+    $readAllAgain = Invoke-Api -Method 'POST' -Path '/api/v1/notifications/read-all' -CookieJar $jarStudent `
+        -Headers @{ 'X-CSRF-Token' = $csrfStudent }
+    Assert-Status 'mark all read is idempotent (still 200)' 200 $readAllAgain
+    Assert-True 'second mark all read changes nothing' `
+        ((((($readAllAgain.Body | ConvertFrom-Json).data).marked)) -eq 0)
 
     # --- Dispatcher happy path (file transport) ---------------------------------------------
     $outbox = Join-Path $script:ApiProjectRoot 'storage/mail-outbox'

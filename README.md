@@ -12,10 +12,10 @@
 
 REGIS-TRACK digitizes the TCGC registrar's paper workflow:
 
-* **Students** (`/student`) — request documents (TOR, Certificate of Enrollment, Grade Certification, etc.), track status via a unique **tracking number**, get notified on every state change, cancel while `Pending`.
-* **Registrar Staff / Admin** (`/staff`, `/admin/users`) — triage a filtered queue, move requests through a **state machine** guarded by the server, leave remarks/reasons, view immutable history + audit trail.
-* **Admin** — manage accounts, generate **summary reports** (JSON/CSV/print), filter by date/status/type.
-* **System** — enforces workflow rules, prevents double-submit (idempotency key), warns on duplicate requests (30-day window), queues dual-channel notifications (in-app + best-effort email via cron), and guarantees audit integrity with a least-privilege DB user (`no UPDATE/DELETE` on audit tables).
+* **Students** (`/student`) — request documents and registrar services from a grouped catalogue (TOR variants, certificates, CAV, and registrar forms), track status via a unique **tracking number**, get notified on every state change, cancel while `Pending`.
+* **Registrar Staff / Admin** (`/staff`) — triage a filtered queue, move requests through a **state machine** guarded by the server, leave remarks/reasons, view immutable history + audit trail.
+* **Admin** — manage accounts, configure **catalogue groups/item metadata + academic terms + per-document issuance policies**, generate **summary reports** (JSON/CSV/print), filter by date/status/type/group.
+* **System** — enforces workflow rules, prevents double-submit (idempotency key), warns on duplicate requests (30-day window) and blocks repeat issuances for once-only/once-per-term documents, queues dual-channel notifications (in-app + best-effort email via cron), and guarantees audit integrity with a least-privilege DB user (`no UPDATE/DELETE` on audit tables).
 
 ### Lifecycle (server-enforced)
 
@@ -26,6 +26,8 @@ Pending → Rejected                      (reason required)
 Pending → Cancelled                     (student, own request)
 Needs Information → Rejected
 In-Process → Needs Information
+In-Process → Rejected
+Ready for Release → Rejected
 Ready for Release → Released
 ```
 `Released / Rejected / Cancelled` are terminal. Every transition writes to `request_history` + `audit_events` in the **same DB transaction**.
@@ -36,13 +38,13 @@ Ready for Release → Released
 
 | Layer | Technology |
 |-------|------------|
-| Frontend | HTML5, CSS3, **vanilla JavaScript SPA** (no framework) — hash routes `#/login #/student #/staff #/reports #/notifications #/admin/users` |
+| Frontend | HTML5, CSS3, **vanilla JavaScript SPA** (no framework) — hash routes `#/login #/student #/staff #/reports #/notifications #/admin/users #/admin/settings` |
 | Backend | **PHP 8.x** — front controller (`public/index.php`) + modular monolith (`App/Core`, `Controllers`, `Services`, `Repositories`) |
 | Database | **MySQL 8 / MariaDB 10.4+** (XAMPP) — PDO prepared statements, append-only audit |
 | Server | Apache (XAMPP prod) or `php -S` built-in server (dev) |
 | Cron | `cron/dispatch_notifications.php` — async email dispatcher with retry/exhaustion |
 | VCS | Git + GitHub |
-| Tests | PHP API tests (164 total) + browser E2E smoke test |
+| Tests | PowerShell API tests (237 total) |
 
 **Why no framework?** — Mandated by the specification (modular monolith, vanilla SPA).
 
@@ -58,19 +60,20 @@ registrack/
 │   ├── assets/             # styles.css, app.js, background.jpg, icon-128.png
 │   └── .htaccess
 ├── app/
-│   ├── Core/               # Config, Database, Router, Http, ErrorHandler, AppContext
+│   ├── Core/               # Config, Database, Router, Http, ErrorHandler, AppContext, Time
 │   ├── Controllers/        # HTTP layer: validate + authorize
-│   ├── Services/           # Business rules, state machine, notifications
+│   ├── Services/           # Business rules, state machine, notifications, issuance policy
 │   └── Repositories/       # All SQL lives here (PDO)
 ├── config/
 │   └── config.example.php  # Copy to config/config.php (gitignored)
 ├── database/
 │   ├── schema.sql          # Full schema — apply as admin user
 │   ├── seed.sql            # Anonymized dev/UAT data (password: Password123!)
+│   ├── migrations/         # Incremental upgrades for existing databases
 │   └── grants.sql          # Least-privilege runtime user
 ├── cron/
 │   └── dispatch_notifications.php
-├── tests/                  # API test suites (Phase 2-7)
+├── tests/                  # PowerShell API suites + run.ps1
 ├── logs/                   # Runtime log (gitignored)
 ├── DECISIONS.md            # Scope freeze — read before changing behavior
 ├── DEPLOYMENT.md           # Production runbook
@@ -111,6 +114,9 @@ Start **Apache** + **MySQL** in the XAMPP Control Panel first.
 ```powershell
 & "C:\xampp\mysql\bin\mysql.exe" -u root -e "source C:/opencode/sofeng/registrack/database/schema.sql"
 & "C:\xampp\mysql\bin\mysql.exe" -u root -e "source C:/opencode/sofeng/registrack/database/seed.sql"
+# existing database (do not re-run schema.sql): apply migrations in order
+& "C:\xampp\mysql\bin\mysql.exe" -u root -e "source C:/opencode/sofeng/registrack/database/migrations/003_issuance_policy.sql"
+& "C:\xampp\mysql\bin\mysql.exe" -u root -e "source C:/opencode/sofeng/registrack/database/migrations/004_tor_once_ever.sql"
 # optional: least-privilege user (production)
 & "C:\xampp\mysql\bin\mysql.exe" -u root -e "source C:/opencode/sofeng/registrack/database/grants.sql"
 ```
@@ -143,18 +149,80 @@ For Apache vhost, point `DocumentRoot` at `registrack/public` (a root `.htaccess
 | `student2@tcgc.edu.ph` | Student | Maria Santos |
 | `student3@tcgc.edu.ph` | Student | Pedro Ramos |
 
-Hash routes: `#/login` → `#/student` (students) or `#/staff` (staff/admin) → `#/reports`, `#/notifications`, `#/admin/users`.
+Hash routes: `#/login` → `#/student` (students) or `#/staff` (staff/admin) → `#/reports`, `#/notifications`, `#/admin/users`, `#/admin/settings`.
+
+The staff **Request queue** defaults to **Active requests** (Pending, Needs Information,
+In-Process, Ready for Release), newest first and 10 per page. Use the status filter to
+view Released, Cancelled, Rejected, or all requests; the Older/Newer controls reach older
+rows. Requests are never deleted. Opening the **Notifications** page automatically marks
+unread in-system notifications as read, and each notification links to its related
+request (staff/admin) or to the student's own request detail.
+
+### Catalogue groups and issuance limits
+
+The active catalogue is organised into four student-facing groups:
+
+* **Student** — enrollment/grade papers, permits, undergraduate TOR variants, and transfer credentials.
+* **Graduate** — graduate TOR variants, diploma, completion certificate, and Latin-Honors/Civil Service papers.
+* **Certification & Authentication (CAV)** — CAV for employment abroad, board exam, apostille, and student visa.
+* **Registrar Forms / Other** — change of personal information, tutorial, adding/dropping, withdrawal, cancellation, graduation application, deficiency, and accreditation forms.
+
+Items marked **Student & Graduate** (the generic TOR and GWA) appear in both Student and
+Graduate. Documents ask for a quantity; CAV and registrar forms are service transactions
+with a fixed quantity of one. Group membership is a display/organisation filter in Phase 1,
+not an eligibility check.
+
+The original five document types keep their existing IDs and issuance policies so historical
+requests and policy checks are unchanged. New catalogue rows use conservative defaults
+(`unlimited` with duplicate warnings) except Permit/Certificate of Continuing
+(once per semester) and TOR-HD for Transfer, TOR-HD for Masteral, Diploma, and Certificate
+of Completion (once only). Administrators can change any policy, group, type, name, or
+active state without deleting historical requests.
+
+| Legacy document | Policy | Enforcement |
+|-----------------|--------|-------------|
+| Transcript of Records | Once only | Blocked; staff can only reject a duplicate |
+| Certificate of Enrollment | Once per semester | Blocked; staff can only reject a duplicate |
+| Grade Certification | Once per semester | Blocked; staff can only reject a duplicate |
+| Certificate of Graduation | Once only | Blocked; staff can only reject a duplicate |
+| Honorable Dismissal | Once only | Blocked; staff can only reject a duplicate |
+
+Admins adjust the policy, catalogue metadata, active state, and school-year/semester
+calendar in **Admin → Settings** (`#/admin/settings`). When a request is blocked, staff see
+only the **Rejected** action; the rejection reason is prefilled and appears in that request's
+processing history. An administrator may still override a blocked issuance with a written
+reason of at least 10 characters; the override is recorded as `request.issuance_override` in
+the audit trail. Cancelled/rejected requests do not consume an issuance.
+
+Terminal requests (`Released`, `Rejected`, `Cancelled`) no longer show a duplicate
+warning, so an older released request does not point at a newer request. Requests that
+were already released before this rule are left unchanged; the rule applies to new
+duplicates.
+
+When staff see the duplicate alert, they can also send a prefilled reply to the student
+("You already received …") without changing the status. The reply becomes the request's
+latest message and is delivered immediately to the student's notification panel; it is
+audited as `request.message_sent`.
+
+**Time zone:** the database stores UTC (the PDO session is pinned to `+00:00`), and every
+timestamp returned by the API is ISO-8601 Asia/Manila (`+08:00`). The browser also formats
+with `timeZone: 'Asia/Manila'`, so the display is correct regardless of device settings.
 
 ---
 
 ## Running tests
 
 ```powershell
-# from project root
-php tests/run.php
-# or per-phase: php tests/phase3_requests/run.php
+# from project root — rebuilds the dev DB, then runs every suite
+powershell -ExecutionPolicy Bypass -File tests\run.ps1 -ResetDatabase
+
+# one suite against an already-pristine DB
+powershell -ExecutionPolicy Bypass -File tests\timezone-tests.ps1
 ```
-164 API tests (Phase 2-7) + SPA E2E smoke test. See `tests/` for suites.
+
+237 API tests across eight PowerShell suites: `timezone`, `issuance`, `api`, `requests`,
+`workflow`, `notifications`, `reports`, `hardening`. `-ResetDatabase` is **destructive** —
+use it only on a development database. Suites also need MySQL running and `php` on `PATH`.
 
 ---
 
@@ -165,9 +233,10 @@ Base: `/api/v1` — JSON, `X-CSRF-Token` required for non-GET when authenticated
 * `POST /api/v1/auth/login`, `POST /api/v1/auth/logout`, `GET /api/v1/me`
 * `GET /api/v1/document-types`
 * `POST /api/v1/requests` (header `Idempotency-Key`), `GET /api/v1/requests/mine`, `GET /api/v1/requests/mine/{tracking}`, `POST /api/v1/requests/mine/{tracking}/cancel`
-* `GET /api/v1/staff/requests?q=&status=&document_type_id=&date_from=&date_to=&page=&page_size=`, `GET /api/v1/requests/{id}`, `POST /api/v1/requests/{id}/transition` (body `to`, `remark`, `version` — concurrency guard)
-* `GET /api/v1/notifications`, `POST /api/v1/notifications/{id}/read`
+* `GET /api/v1/staff/requests?active_only=1&q=&status=&document_type_id=&catalog_group=&date_from=&date_to=&page=&page_size=`, `GET /api/v1/requests/{id}`, `POST /api/v1/requests/{id}/transition` (body `to`, `remark`, `version` — concurrency guard; optional `override_issuance` for administrators, with a written reason), `POST /api/v1/requests/{id}/message` (staff reply without a status change)
+* `GET /api/v1/notifications`, `POST /api/v1/notifications/{id}/read`, `POST /api/v1/notifications/read-all`
 * `GET /api/v1/admin/reports/summary?from=&to=&status=&format=csv`, `GET /api/v1/admin/users`, `POST /api/v1/admin/users`
+* `GET /api/v1/admin/settings`, `POST /api/v1/admin/terms`, `PATCH /api/v1/admin/terms/{id}`, `POST /api/v1/admin/document-types`, `PATCH /api/v1/admin/document-types/{id}`
 * `GET /health`
 
 ---
@@ -177,6 +246,10 @@ Base: `/api/v1` — JSON, `X-CSRF-Token` required for non-GET when authenticated
 * **Login** — full-viewport background `public/assets/background.jpg` (TCGC seal), sharp (no blur), centered card `400px`, `16px` radius, soft shadow, `100dvh` no-scroll.
 * **App shell** — sage wash `#eef3ee` outer, soft cards `16px`, `soft-table` rows (`12px` pill badges — Pending yellow, Ready mint, Released green, Rejected red), `report-toolbar` pills, `pagination` mimic, content gap `1.6rem` (no more “nagtapad”).
 * **Sidebar** — pinned bottom profile card (initials + `TCGC Registrar Administrator` + `Dark mode` + `Log out`) like the reference design, `240px` fixed.
+* **Request queue** — defaults to active requests, newest first, 10 per page; status and catalogue-group filters expose terminal (Released/Cancelled/Rejected) and all requests, with Older/Newer pagination. Nothing is deleted.
+* **Student request form** — group filter plus a grouped type picker; selecting a document shows quantity, purpose, and release date, while CAV/forms switch to details and a preferred appointment date without a quantity field.
+* **Admin settings** — edit catalogue name/group/type/policy/active inline, or add a new catalogue item.
+* **Notifications** — each notification card opens the related request; opening the page auto-marks unread items as read and clears the sidebar badge immediately.
 * **Dark mode** — toggle above Log out, persisted in `localStorage`.
 
 ---
@@ -195,12 +268,15 @@ Base: `/api/v1` — JSON, `X-CSRF-Token` required for non-GET when authenticated
 - [x] Phase 0 — scope freeze
 - [x] Phase 1 — skeleton
 - [x] Phase 2 — auth & RBAC (26/26 tests)
-- [x] Phase 3 — request submission (33/33)
+- [x] Phase 3 — request submission (35/35)
 - [x] Phase 4 — workflow engine + audit (31/31)
-- [x] Phase 5 — notifications + cron dispatcher (28/28)
-- [x] Phase 6 — search + reports (32/32)
-- [x] Phase 7 — hardening + backup drill (14/14 — 164 total)
-- [x] Phase 8 — SPA + deployment runbook — E2E passed
+- [x] Phase 5 — notifications + cron dispatcher (34/34)
+- [x] Phase 6 — search + reports (38/38)
+- [x] Phase 7 — hardening + backup drill (14/14)
+- [x] Phase 8 — SPA + deployment runbook (manual smoke)
+- [x] Phase 9 — Asia/Manila timestamps + issuance policies (timezone 14/14, issuance 61/61)
+- [x] Phase 10 — active queue + clickable notifications + auto-read (237 total)
+- [x] Phase 11 — registrar catalogue foundation: groups, CAV/forms, admin CRUD, queue group filter (253 total)
 
 ---
 

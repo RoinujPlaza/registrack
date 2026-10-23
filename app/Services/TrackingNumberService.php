@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace RegisTrack\Services;
 
 use PDO;
+use RegisTrack\Core\Time;
 use RuntimeException;
 
 /**
@@ -25,7 +26,7 @@ final class TrackingNumberService
         for ($attempt = 0; $attempt < self::MAX_ATTEMPTS; $attempt++) {
             $candidate = sprintf(
                 'RT-%s-%s',
-                gmdate('Ymd'),
+                Time::manilaNow()->format('Ymd'),
                 self::randomSegment()
             );
 

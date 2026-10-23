@@ -6,6 +6,7 @@ namespace RegisTrack\Repositories;
 
 use PDO;
 use RegisTrack\Core\AppContext;
+use RegisTrack\Core\Time;
 
 /**
  * Aggregate queries for the summary report (use case Table 13).
@@ -28,8 +29,13 @@ final class ReportRepository
     /** @return array{from:string, to:string, params:array, where:string} */
     public function buildFilter(array $filters): array
     {
-        $where = ['r.submitted_at >= ?', 'r.submitted_at < DATE_ADD(?, INTERVAL 1 DAY)'];
-        $params = [$filters['from'], $filters['to']];
+        // The selected dates are Philippine calendar days; convert them to the
+        // UTC half-open interval actually stored in requests.submitted_at.
+        [$fromUtc] = Time::manilaDayBounds((string) $filters['from']);
+        [, $toUtc] = Time::manilaDayBounds((string) $filters['to']);
+
+        $where = ['r.submitted_at >= ?', 'r.submitted_at < ?'];
+        $params = [$fromUtc, $toUtc];
 
         if (!empty($filters['status'])) {
             $where[] = 'r.status = ?';
@@ -91,10 +97,10 @@ final class ReportRepository
     public function submissionsByDay(array $filter): array
     {
         $statement = $this->db->prepare(
-            "SELECT DATE(r.submitted_at) AS day, COUNT(*) AS submitted
+            "SELECT DATE(CONVERT_TZ(r.submitted_at, '+00:00', '+08:00')) AS day, COUNT(*) AS submitted
              FROM requests r
              {$filter['where']}
-             GROUP BY DATE(r.submitted_at)
+             GROUP BY DATE(CONVERT_TZ(r.submitted_at, '+00:00', '+08:00'))
              ORDER BY day ASC"
         );
         $statement->execute($filter['params']);
@@ -106,11 +112,11 @@ final class ReportRepository
     public function releasesByDay(array $filter): array
     {
         $statement = $this->db->prepare(
-            "SELECT DATE(r.released_at) AS day, COUNT(*) AS released
+            "SELECT DATE(CONVERT_TZ(r.released_at, '+00:00', '+08:00')) AS day, COUNT(*) AS released
              FROM requests r
              {$filter['where']}
                AND r.released_at IS NOT NULL
-             GROUP BY DATE(r.released_at)
+             GROUP BY DATE(CONVERT_TZ(r.released_at, '+00:00', '+08:00'))
              ORDER BY day ASC"
         );
         $statement->execute($filter['params']);

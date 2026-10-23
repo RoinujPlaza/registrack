@@ -44,9 +44,11 @@ final class RequestStateMachine
         'in_process' => [
             'ready_for_release' => ['reason' => 'optional'],
             'needs_information' => ['reason' => 'required'],
+            'rejected' => ['reason' => 'required'],
         ],
         'ready_for_release' => [
             'released' => ['reason' => 'optional'],
+            'rejected' => ['reason' => 'required'],
         ],
         // released, rejected, cancelled are terminal: no entries.
     ];

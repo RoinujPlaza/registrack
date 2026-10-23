@@ -36,6 +36,9 @@ All five gates in `SECURITY.md` are **mandatory**:
 
 1. Provision PHP 8.x + MySQL 8/MariaDB 10.4+ host; document root → `public/`.
 2. Import `schema.sql` (fresh) — do **not** import `seed.sql` (fictional data).
+   For an existing pilot database, apply `database/migrations/003_issuance_policy.sql`,
+   `database/migrations/004_tor_once_ever.sql`, and then
+   `database/migrations/005_document_catalog.sql` instead of re-importing the schema.
 3. Create the first admin: insert manually via SQL using a bcrypt hash
    (`php -r "echo password_hash('...', PASSWORD_DEFAULT);"`) or run the app
    with seed, promote a real account, then delete seed accounts.
@@ -44,7 +47,10 @@ All five gates in `SECURITY.md` are **mandatory**:
 5. Schedule the email dispatcher: cron `*/5 * * * * php .../cron/dispatch_notifications.php`
    (or trigger manually if the host has no cron).
 6. Schedule nightly backup; verify the first backup restores.
-7. Run the six test suites once against staging data before opening to users.
+7. Open **Admin → Settings**: confirm the current school year/semester dates, the
+   active catalogue rows/groups, and issuance policies match institutional policy before
+   enabling requests.
+8. Run all eight test suites once against staging data before opening to users.
 
 ## Rollback
 
@@ -58,3 +64,6 @@ All five gates in `SECURITY.md` are **mandatory**:
 - "Real-time" = near-real-time: dashboards poll while open; email is async
   via cron (no latency guarantee).
 - Tracking numbers are opaque and random; never expose sequential IDs.
+- Server time zone does not matter: the app pins its DB session to UTC and presents
+  Asia/Manila. Ensure PHP's `date.timezone` is not relied on for display (it is UTC in
+  `public/index.php`).

@@ -32,8 +32,13 @@ try {
     # --- Document types ----------------------------------------------------------
     $types = Invoke-Api -Method 'GET' -Path '/api/v1/document-types' -CookieJar $jarStudentA
     Assert-Status 'document types list for authenticated user' 200 $types
-    Assert-True 'document types seeded (>= 5 active)' `
-        (((($types.Body | ConvertFrom-Json).data).items | Measure-Object).Count -ge 5)
+    $typeItems = ((($types.Body | ConvertFrom-Json).data).items)
+    Assert-True 'document types seeded (>= 20 active)' `
+        (($typeItems | Measure-Object).Count -ge 20)
+    Assert-True 'document types expose catalogue metadata' `
+        ($null -ne $typeItems[0].catalog_group -and $null -ne $typeItems[0].item_type)
+    Assert-True 'document types include CAV services' `
+        ((@($typeItems | Where-Object { $_.catalog_group -eq 'cav' -and $_.item_type -eq 'service' }) | Measure-Object).Count -ge 4)
 
     # --- RBAC: only students submit ------------------------------------------------
     Assert-Status 'staff cannot submit a request (403)' 403 `

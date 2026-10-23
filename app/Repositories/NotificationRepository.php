@@ -47,17 +47,20 @@ final class NotificationRepository
      */
     public function listForRecipient(int $recipientId, bool $unreadOnly, int $page, int $pageSize): array
     {
-        $where = "recipient_id = ? AND channel = 'in_system'" . ($unreadOnly ? ' AND read_at IS NULL' : '');
+        $where = "n.recipient_id = ? AND n.channel = 'in_system'" . ($unreadOnly ? ' AND n.read_at IS NULL' : '');
 
-        $countStatement = $this->db->prepare("SELECT COUNT(*) FROM notifications WHERE $where");
+        $countStatement = $this->db->prepare("SELECT COUNT(*) FROM notifications n WHERE $where");
         $countStatement->execute([$recipientId]);
         $total = (int) $countStatement->fetchColumn();
 
+        // The tracking number lets the SPA open the student's request by its
+        // tracking route; staff use request_id for their own detail route.
         $listStatement = $this->db->prepare(
-            "SELECT id, request_id, channel, subject, body, read_at, created_at
-             FROM notifications
+            "SELECT n.id, n.request_id, r.tracking_number, n.channel, n.subject, n.body, n.read_at, n.created_at
+             FROM notifications n
+             LEFT JOIN requests r ON r.id = n.request_id
              WHERE $where
-             ORDER BY created_at DESC, id DESC
+             ORDER BY n.created_at DESC, n.id DESC
              LIMIT ? OFFSET ?"
         );
         $listStatement->execute([$recipientId, $pageSize, ($page - 1) * $pageSize]);
@@ -95,6 +98,22 @@ final class NotificationRepository
              WHERE id = ? AND recipient_id = ? AND read_at IS NULL'
         );
         $statement->execute([$id, $recipientId]);
+
+        return $statement->rowCount();
+    }
+
+    /**
+     * Mark every unread in-system notification for one recipient as read.
+     * Used when the notification panel is opened, so the student/staff does
+     * not have to click each item individually. Idempotent.
+     */
+    public function markAllRead(int $recipientId): int
+    {
+        $statement = $this->db->prepare(
+            "UPDATE notifications SET read_at = UTC_TIMESTAMP()
+             WHERE recipient_id = ? AND channel = 'in_system' AND read_at IS NULL"
+        );
+        $statement->execute([$recipientId]);
 
         return $statement->rowCount();
     }

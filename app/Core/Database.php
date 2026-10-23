@@ -28,7 +28,7 @@ final class Database
             (string) $config->get('db.name', 'registrack')
         );
 
-        self::$connection = new PDO(
+        $connection = new PDO(
             $dsn,
             (string) $config->get('db.user', 'root'),
             (string) $config->get('db.password', ''),
@@ -38,6 +38,13 @@ final class Database
                 PDO::ATTR_EMULATE_PREPARES   => false,
             ]
         );
+
+        // Pin the session to UTC so TIMESTAMP columns and the UTC DATETIME
+        // columns are read with the same meaning. Presentation converts to
+        // Philippine time in one place (RegisTrack\Core\Time).
+        $connection->exec("SET time_zone = '+00:00'");
+
+        self::$connection = $connection;
 
         return self::$connection;
     }

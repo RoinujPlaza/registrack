@@ -7,6 +7,7 @@ namespace RegisTrack\Controllers;
 use RegisTrack\Core\Auth;
 use RegisTrack\Core\Csrf;
 use RegisTrack\Core\Http;
+use RegisTrack\Core\Time;
 use RegisTrack\Repositories\NotificationRepository;
 
 /**
@@ -28,7 +29,24 @@ final class NotificationController
         $result = $repository->listForRecipient((int) $user['id'], $unreadOnly, $page, $pageSize);
 
         Http::json([
-            'items' => $result['items'],
+            'items' => array_map(static fn (array $notification): array => [
+                'id' => (int) $notification['id'],
+                'request_id' => $notification['request_id'] !== null ? (int) $notification['request_id'] : null,
+                'tracking_number' => isset($notification['tracking_number']) && $notification['tracking_number'] !== null
+                    ? (string) $notification['tracking_number']
+                    : null,
+                'channel' => (string) $notification['channel'],
+                'subject' => (string) $notification['subject'],
+                'body' => (string) $notification['body'],
+                'read_at' => Time::toManila(
+                    isset($notification['read_at']) && $notification['read_at'] !== null
+                        ? (string) $notification['read_at']
+                        : null
+                ),
+                'created_at' => Time::toManila(
+                    isset($notification['created_at']) ? (string) $notification['created_at'] : null
+                ),
+            ], $result['items']),
             'meta' => [
                 'page' => $page,
                 'page_size' => $pageSize,
@@ -56,6 +74,21 @@ final class NotificationController
 
         Http::json([
             'id' => $id,
+            'unread' => $repository->countUnread((int) $user['id']),
+        ]);
+    }
+
+    /** POST /api/v1/notifications/read-all — auto-acknowledge the panel. */
+    public static function markAllRead(array $params): void
+    {
+        $user = Auth::requireUser();
+        Csrf::validate();
+
+        $repository = new NotificationRepository();
+        $marked = $repository->markAllRead((int) $user['id']);
+
+        Http::json([
+            'marked' => $marked,
             'unread' => $repository->countUnread((int) $user['id']),
         ]);
     }

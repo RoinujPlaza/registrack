@@ -14,6 +14,7 @@ use RegisTrack\Controllers\DocumentTypeController;
 use RegisTrack\Controllers\NotificationController;
 use RegisTrack\Controllers\ReportController;
 use RegisTrack\Controllers\RequestController;
+use RegisTrack\Controllers\SettingsController;
 use RegisTrack\Controllers\StaffController;
 use RegisTrack\Core\AppContext;
 use RegisTrack\Core\ErrorHandler;
@@ -56,6 +57,13 @@ $router->add('GET', '/api/v1/admin/users', [AdminController::class, 'listUsers']
 $router->add('POST', '/api/v1/admin/users', [AdminController::class, 'createUser']);
 $router->add('PATCH', '/api/v1/admin/users/{id}', [AdminController::class, 'updateUser']);
 
+// Admin settings — academic terms and issuance policies
+$router->add('GET', '/api/v1/admin/settings', [SettingsController::class, 'show']);
+$router->add('POST', '/api/v1/admin/terms', [SettingsController::class, 'createTerm']);
+$router->add('PATCH', '/api/v1/admin/terms/{id}', [SettingsController::class, 'updateTerm']);
+$router->add('POST', '/api/v1/admin/document-types', [SettingsController::class, 'createDocumentType']);
+$router->add('PATCH', '/api/v1/admin/document-types/{id}', [SettingsController::class, 'updateDocumentType']);
+
 // Phase 3 — Request submission (FR2)
 $router->add('GET', '/api/v1/document-types', [DocumentTypeController::class, 'list']);
 $router->add('POST', '/api/v1/requests', [RequestController::class, 'submit']);
@@ -67,9 +75,11 @@ $router->add('POST', '/api/v1/requests/mine/{trackingNumber}/cancel', [RequestCo
 $router->add('GET', '/api/v1/staff/requests', [StaffController::class, 'queue']);
 $router->add('GET', '/api/v1/requests/{id}', [StaffController::class, 'detail']);
 $router->add('POST', '/api/v1/requests/{id}/transition', [StaffController::class, 'transition']);
+$router->add('POST', '/api/v1/requests/{id}/message', [StaffController::class, 'message']);
 
 // Phase 5 — Notification panel (FR4)
 $router->add('GET', '/api/v1/notifications', [NotificationController::class, 'list']);
+$router->add('POST', '/api/v1/notifications/read-all', [NotificationController::class, 'markAllRead']);
 $router->add('POST', '/api/v1/notifications/{id}/read', [NotificationController::class, 'markRead']);
 
 // Phase 6 — Reports (FR6 / use case Table 13)

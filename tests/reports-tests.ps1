@@ -64,9 +64,24 @@ try {
     Assert-True 'status=pending finds exactly the pending fixture' `
         ((((($q1.Body | ConvertFrom-Json).data).meta).total) -eq 1)
 
+    $qActive = Invoke-Api -Method 'GET' -Path '/api/v1/staff/requests?active_only=1' -CookieJar $jarStaff
+    Assert-True 'active_only excludes terminal fixtures' `
+        ((((($qActive.Body | ConvertFrom-Json).data).meta).total) -eq 1 -and
+         ((((($qActive.Body | ConvertFrom-Json).data).items)[0].id) -eq $r3.id))
+
     $q2 = Invoke-Api -Method 'GET' -Path '/api/v1/staff/requests?document_type_id=1' -CookieJar $jarStaff
     Assert-True 'type filter finds the two TOR fixtures' `
         ((((($q2.Body | ConvertFrom-Json).data).meta).total) -eq 2)
+
+    $qStudent = Invoke-Api -Method 'GET' -Path '/api/v1/staff/requests?catalog_group=student' -CookieJar $jarStaff
+    Assert-True 'student group filter includes shared TOR + COE fixtures' `
+        ((((($qStudent.Body | ConvertFrom-Json).data).meta).total) -eq 3)
+    $qGraduate = Invoke-Api -Method 'GET' -Path '/api/v1/staff/requests?catalog_group=graduate' -CookieJar $jarStaff
+    Assert-True 'graduate group filter includes shared TOR fixtures' `
+        ((((($qGraduate.Body | ConvertFrom-Json).data).meta).total) -eq 2)
+    $qCav = Invoke-Api -Method 'GET' -Path '/api/v1/staff/requests?catalog_group=cav' -CookieJar $jarStaff
+    Assert-True 'CAV group filter finds no fixtures' `
+        ((((($qCav.Body | ConvertFrom-Json).data).meta).total) -eq 0)
 
     $q3 = Invoke-Api -Method 'GET' -Path "/api/v1/staff/requests?status=released&document_type_id=1" -CookieJar $jarStaff
     Assert-True 'combined status+type filter finds one' `
@@ -76,13 +91,13 @@ try {
     Assert-True 'q search by tracking finds one' `
         ((((($q4.Body | ConvertFrom-Json).data).meta).total) -eq 1)
 
-    $todayUtc = (Get-Date).ToUniversalTime().ToString('yyyy-MM-dd')
-    $tomorrowUtc = (Get-Date).ToUniversalTime().AddDays(1).ToString('yyyy-MM-dd')
-    $q5 = Invoke-Api -Method 'GET' -Path "/api/v1/staff/requests?date_from=$todayUtc&date_to=$todayUtc" -CookieJar $jarStaff
+    $todayManila = $manilaToday.ToString('yyyy-MM-dd')
+    $tomorrowManila = $manilaToday.AddDays(1).ToString('yyyy-MM-dd')
+    $q5 = Invoke-Api -Method 'GET' -Path "/api/v1/staff/requests?date_from=$todayManila&date_to=$todayManila" -CookieJar $jarStaff
     Assert-True 'today date range finds all three' `
         ((((($q5.Body | ConvertFrom-Json).data).meta).total) -eq 3)
 
-    $q6 = Invoke-Api -Method 'GET' -Path "/api/v1/staff/requests?date_from=$tomorrowUtc" -CookieJar $jarStaff
+    $q6 = Invoke-Api -Method 'GET' -Path "/api/v1/staff/requests?date_from=$tomorrowManila" -CookieJar $jarStaff
     Assert-True 'future date range finds none' `
         ((((($q6.Body | ConvertFrom-Json).data).meta).total) -eq 0)
 
@@ -94,6 +109,10 @@ try {
          ((((($page1.Body | ConvertFrom-Json).data).meta).total) -eq 3))
     Assert-True 'page 2 returns the remaining item' `
         (((((($page2.Body | ConvertFrom-Json).data).items) | Measure-Object).Count) -eq 1)
+    Assert-True 'queue is newest first (page 1 starts with the latest fixture)' `
+        ((((($page1.Body | ConvertFrom-Json).data).items)[0].id) -eq $r3.id)
+    Assert-True 'queue pagination keeps newest-first order (page 2 starts with the oldest fixture)' `
+        ((((($page2.Body | ConvertFrom-Json).data).items)[0].id) -eq $r1.id)
 
     # --- Access control -----------------------------------------------------------------
     Assert-Status 'student blocked from reports (403)' 403 `
@@ -111,7 +130,7 @@ try {
     $torRow = $summary.by_document_type | Where-Object { $_.document_type_name -like 'Transcript*' }
     Assert-True 'TOR row: total 2, released 1, rejected 1' `
         ($torRow.total -eq 2 -and $torRow.released -eq 1 -and $torRow.rejected -eq 1)
-    $todayRow = $summary.by_day | Where-Object { $_.day -eq $todayUtc }
+    $todayRow = $summary.by_day | Where-Object { $_.day -eq $todayManila }
     Assert-True 'by_day today: submitted 3, released 1' `
         ($todayRow.submitted -eq 3 -and $todayRow.released -eq 1)
 
@@ -121,7 +140,7 @@ try {
     Assert-True 'filtered report totals.submitted is 1' ($releasedSummary.totals.submitted -eq 1)
 
     # --- Zero-value empty state (Figure 14) --------------------------------------------------------
-    $farFuture = (Get-Date).ToUniversalTime().AddDays(60).ToString('yyyy-MM-dd')
+    $farFuture = $manilaToday.AddDays(60).ToString('yyyy-MM-dd')
     $reportEmpty = Invoke-Api -Method 'GET' -Path "/api/v1/admin/reports/summary?from=$farFuture&to=$farFuture" -CookieJar $jarStaff
     Assert-Status 'empty-range report still 200' 200 $reportEmpty
     $emptySummary = (($reportEmpty.Body | ConvertFrom-Json).data).summary
@@ -132,9 +151,9 @@ try {
     Assert-Status 'bad date format rejected (422)' 422 `
         (Invoke-Api -Method 'GET' -Path '/api/v1/admin/reports/summary?from=not-a-date' -CookieJar $jarStaff)
     Assert-Status 'from > to rejected (422)' 422 `
-        (Invoke-Api -Method 'GET' -Path "/api/v1/admin/reports/summary?from=$tomorrowUtc&to=$todayUtc" -CookieJar $jarStaff)
+        (Invoke-Api -Method 'GET' -Path "/api/v1/admin/reports/summary?from=$tomorrowManila&to=$todayManila" -CookieJar $jarStaff)
     Assert-Status 'range over 366 days rejected (422)' 422 `
-        (Invoke-Api -Method 'GET' -Path "/api/v1/admin/reports/summary?from=2020-01-01&to=$todayUtc" -CookieJar $jarStaff)
+        (Invoke-Api -Method 'GET' -Path "/api/v1/admin/reports/summary?from=2020-01-01&to=$todayManila" -CookieJar $jarStaff)
     Assert-Status 'unknown status filter rejected (422)' 422 `
         (Invoke-Api -Method 'GET' -Path '/api/v1/admin/reports/summary?status=flying' -CookieJar $jarStaff)
 

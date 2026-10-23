@@ -7,6 +7,7 @@ namespace RegisTrack\Controllers;
 use RegisTrack\Core\Auth;
 use RegisTrack\Core\Csrf;
 use RegisTrack\Core\Http;
+use RegisTrack\Repositories\DocumentTypeRepository;
 use RegisTrack\Repositories\RequestRepository;
 use RegisTrack\Services\RequestService;
 use RegisTrack\Services\RequestStateMachine;
@@ -17,7 +18,7 @@ use RegisTrack\Services\RequestStateMachine;
  */
 final class StaffController
 {
-    /** GET /api/v1/staff/requests?status=&q=&document_type_id=&date_from=&date_to=&page= */
+    /** GET /api/v1/staff/requests?active_only=1&status=&q=&document_type_id=&catalog_group=&date_from=&date_to=&page= */
     public static function queue(array $params): void
     {
         Auth::requireRole(['staff', 'admin']);
@@ -29,6 +30,8 @@ final class StaffController
         $status = (string) ($_GET['status'] ?? '');
         if ($status !== '' && RequestStateMachine::isValidStatus($status)) {
             $filters['status'] = $status;
+        } elseif (($_GET['active_only'] ?? '') === '1') {
+            $filters['active_only'] = true;
         }
         $q = trim((string) ($_GET['q'] ?? ''));
         if ($q !== '') {
@@ -37,6 +40,10 @@ final class StaffController
         $typeId = (int) ($_GET['document_type_id'] ?? 0);
         if ($typeId > 0) {
             $filters['document_type_id'] = $typeId;
+        }
+        $catalogGroup = trim((string) ($_GET['catalog_group'] ?? ''));
+        if (in_array($catalogGroup, DocumentTypeRepository::CATALOG_GROUPS, true)) {
+            $filters['catalog_group'] = $catalogGroup;
         }
         foreach (['date_from', 'date_to'] as $dateFilter) {
             $value = trim((string) ($_GET[$dateFilter] ?? ''));
@@ -48,7 +55,7 @@ final class StaffController
         $result = (new RequestRepository())->listForStaff($filters, $page, $pageSize);
 
         Http::json([
-            'items' => $result['items'],
+            'items' => array_map([RequestService::class, 'presentPublic'], $result['items']),
             'meta' => ['page' => $page, 'page_size' => $pageSize, 'total' => $result['total']],
         ]);
     }
@@ -89,6 +96,7 @@ final class StaffController
         $toStatus = (string) ($body['to'] ?? '');
         $remark = isset($body['remark']) ? trim((string) $body['remark']) : null;
         $version = (int) ($body['version'] ?? 0);
+        $overrideIssuance = filter_var($body['override_issuance'] ?? false, FILTER_VALIDATE_BOOLEAN);
 
         $fields = [];
         if ($toStatus === '') {
@@ -102,7 +110,31 @@ final class StaffController
             return;
         }
 
-        $result = RequestService::transition($actor, $id, $toStatus, $remark, $version);
+        $result = RequestService::transition($actor, $id, $toStatus, $remark, $version, $overrideIssuance);
+        if ($result['ok']) {
+            Http::json($result['data']);
+            return;
+        }
+
+        Http::error($result['code'], $result['message'], $result['status'], $result['fields'] ?? []);
+    }
+
+    /** POST /api/v1/requests/{id}/message — staff reply without a status change. */
+    public static function message(array $params): void
+    {
+        Auth::requireRole(['staff', 'admin']);
+        Csrf::validate();
+
+        $id = (int) $params['id'];
+        if ($id <= 0) {
+            Http::error('not_found', 'Request not found.', 404);
+            return;
+        }
+
+        $body = Http::jsonBody();
+        $message = isset($body['message']) ? (string) $body['message'] : null;
+
+        $result = RequestService::sendMessage($id, $message);
         if ($result['ok']) {
             Http::json($result['data']);
             return;
