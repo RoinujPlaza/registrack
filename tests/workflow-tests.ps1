@@ -69,6 +69,20 @@ try {
     Assert-Status 'student cannot open staff detail (403)' 403 `
         (Invoke-Api -Method 'GET' -Path "/api/v1/requests/$($r1.id)" -CookieJar $jarStudent)
 
+    # --- RBAC: administrators are view-only -------------------------------------------------
+    Assert-Status 'admin can view staff request detail (200)' 200 `
+        (Invoke-Api -Method 'GET' -Path "/api/v1/requests/$($r1.id)" -CookieJar $jarAdmin)
+
+    Assert-Status 'admin cannot transition requests (403)' 403 `
+        (Invoke-Api -Method 'POST' -Path "/api/v1/requests/$($r1.id)/transition" -CookieJar $jarAdmin `
+            -Headers @{ 'X-CSRF-Token' = $csrfAdmin } `
+            -Body ('{"to":"in_process","version":' + $r1.version + '}'))
+
+    Assert-Status 'admin cannot message students (403)' 403 `
+        (Invoke-Api -Method 'POST' -Path "/api/v1/requests/$($r1.id)/message" -CookieJar $jarAdmin `
+            -Headers @{ 'X-CSRF-Token' = $csrfAdmin } `
+            -Body '{"message":"Administrator should not be able to send this."}')
+
     # --- Queue + search ---------------------------------------------------------------
     $queue = Invoke-Api -Method 'GET' -Path '/api/v1/staff/requests?status=pending' -CookieJar $jarStaff
     Assert-Status 'staff queue (pending filter)' 200 $queue
@@ -114,24 +128,24 @@ try {
             -Headers @{ 'X-CSRF-Token' = $csrfStaff } -Body '{"to":"released","version":2}')
 
     # --- Concurrency: stale version conflicts (409) ------------------------------------------------
-    $concurrent = Invoke-Api -Method 'POST' -Path "/api/v1/requests/$($r1.id)/transition" -CookieJar $jarAdmin `
-        -Headers @{ 'X-CSRF-Token' = $csrfAdmin } -Body '{"to":"ready_for_release","version":2}'
-    Assert-Status 'admin transitions with current version (200)' 200 $concurrent
+    $concurrent = Invoke-Api -Method 'POST' -Path "/api/v1/requests/$($r1.id)/transition" -CookieJar $jarStaff `
+        -Headers @{ 'X-CSRF-Token' = $csrfStaff } -Body '{"to":"ready_for_release","version":2}'
+    Assert-Status 'staff transitions with current version (200)' 200 $concurrent
 
     $stale = Invoke-Api -Method 'POST' -Path "/api/v1/requests/$($r1.id)/transition" -CookieJar $jarStaff `
         -Headers @{ 'X-CSRF-Token' = $csrfStaff } -Body '{"to":"released","version":2}'
     Assert-Status 'stale version rejected with 409' 409 $stale
 
     # --- Terminal state -------------------------------------------------------------------------------
-    $release = Invoke-Api -Method 'POST' -Path "/api/v1/requests/$($r1.id)/transition" -CookieJar $jarAdmin `
-        -Headers @{ 'X-CSRF-Token' = $csrfAdmin } -Body '{"to":"released","version":3,"remark":"Released at window 1"}'
+    $release = Invoke-Api -Method 'POST' -Path "/api/v1/requests/$($r1.id)/transition" -CookieJar $jarStaff `
+        -Headers @{ 'X-CSRF-Token' = $csrfStaff } -Body '{"to":"released","version":3,"remark":"Released at window 1"}'
     Assert-Status 'ready_for_release -> released (200)' 200 $release
     $releasedRequest = (($release.Body | ConvertFrom-Json).data).request
     Assert-True 'released_at recorded' ($null -ne $releasedRequest.released_at)
 
     Assert-Status 'terminal state: released -> anything rejected (422)' 422 `
-        (Invoke-Api -Method 'POST' -Path "/api/v1/requests/$($r1.id)/transition" -CookieJar $jarAdmin `
-            -Headers @{ 'X-CSRF-Token' = $csrfAdmin } -Body '{"to":"in_process","version":4}')
+        (Invoke-Api -Method 'POST' -Path "/api/v1/requests/$($r1.id)/transition" -CookieJar $jarStaff `
+            -Headers @{ 'X-CSRF-Token' = $csrfStaff } -Body '{"to":"in_process","version":4}')
 
     # --- Reason-required flows on R2 ----------------------------------------------------------------------
     $noReason = Invoke-Api -Method 'POST' -Path "/api/v1/requests/$($r2.id)/transition" -CookieJar $jarStaff `

@@ -364,6 +364,28 @@ input, select, textarea {
     background: #fff;
 }
 input:focus, select:focus, textarea:focus { outline: 2px solid var(--green); border-color: var(--green); }
+
+/* Password field with a show/hide control inside the right edge. */
+.password-wrap { position: relative; }
+.password-wrap input { padding-right: 2.75rem; }
+.password-toggle {
+    position: absolute;
+    right: 0.3rem;
+    top: 50%;
+    transform: translateY(-50%);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    padding: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--gray);
+}
+.password-toggle:hover { background: var(--bg); color: var(--green-dark); }
+.password-toggle .nav-icon { width: 18px; height: 18px; }
+.password-toggle:focus-visible { outline: 2px solid var(--green); outline-offset: 1px; }
 .field-error { color: var(--red); font-size: 0.8rem; margin: 0.15rem 0 0; }
 .form-error {
     background: #fdecec; color: var(--red);
@@ -714,6 +736,8 @@ body:has(.shell:has(.sidebar.hidden)) {
 [data-theme="dark"] .muted { color: var(--gray); }
 [data-theme="dark"] button.secondary { background: #252e2b; color: var(--text); border-color: var(--border); }
 [data-theme="dark"] button.secondary:hover { background: #2e3835; }
+[data-theme="dark"] .password-toggle { color: var(--gray); }
+[data-theme="dark"] .password-toggle:hover { background: #2e3835; color: #fff; }
 [data-theme="dark"] .form-error { background: #3a1f1f; color: #fca5a5; border-color: #7f1d1d; }
 [data-theme="dark"] .form-success { background: #1a2e22; color: #86efac; border-color: #14532d; }
 [data-theme="dark"] .form-warning { background: #2e2410; color: #fcd34d; border-color: #92400e; }

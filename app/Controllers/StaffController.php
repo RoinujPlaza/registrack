@@ -13,8 +13,9 @@ use RegisTrack\Services\RequestService;
 use RegisTrack\Services\RequestStateMachine;
 
 /**
- * Registrar staff endpoints (FR3 workflow + queue). Admin shares full access;
- * students have their own scoped endpoints and never reach these.
+ * Registrar request endpoints. Staff manage the workflow; administrators have
+ * read-only access to the queue and detail for oversight. Students use their
+ * own scoped endpoints and never reach these.
  */
 final class StaffController
 {
@@ -83,7 +84,7 @@ final class StaffController
     /** POST /api/v1/requests/{id}/transition — state-machine guarded (FR3). */
     public static function transition(array $params): void
     {
-        $actor = Auth::requireRole(['staff', 'admin']);
+        $actor = Auth::requireRole(['staff']);
         Csrf::validate();
 
         $id = (int) $params['id'];
@@ -96,7 +97,6 @@ final class StaffController
         $toStatus = (string) ($body['to'] ?? '');
         $remark = isset($body['remark']) ? trim((string) $body['remark']) : null;
         $version = (int) ($body['version'] ?? 0);
-        $overrideIssuance = filter_var($body['override_issuance'] ?? false, FILTER_VALIDATE_BOOLEAN);
 
         $fields = [];
         if ($toStatus === '') {
@@ -110,7 +110,7 @@ final class StaffController
             return;
         }
 
-        $result = RequestService::transition($actor, $id, $toStatus, $remark, $version, $overrideIssuance);
+        $result = RequestService::transition($actor, $id, $toStatus, $remark, $version);
         if ($result['ok']) {
             Http::json($result['data']);
             return;
@@ -122,7 +122,7 @@ final class StaffController
     /** POST /api/v1/requests/{id}/message — staff reply without a status change. */
     public static function message(array $params): void
     {
-        Auth::requireRole(['staff', 'admin']);
+        Auth::requireRole(['staff']);
         Csrf::validate();
 
         $id = (int) $params['id'];

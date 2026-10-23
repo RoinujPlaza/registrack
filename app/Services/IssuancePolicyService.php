@@ -20,8 +20,7 @@ use RegisTrack\Repositories\RequestRepository;
  *
  * The policy is stored per document type so the Registrar can change it without
  * a code change. Enforcement happens server-side on every staff transition;
- * a blocked duplicate may only be rejected unless an administrator records an
- * audited override.
+ * a blocked duplicate may only be rejected. Administrators are read-only.
  */
 final class IssuancePolicyService
 {

@@ -228,6 +228,8 @@ const NAV_ICONS = {
     logout: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>',
     sun: '<circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>',
     moon: '<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>',
+    eye: '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>',
+    'eye-off': '<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/><path d="M14.12 14.12a3 3 0 1 1-4.24-4.24"/>',
 };
 
 function navIcon(name) {
@@ -242,6 +244,25 @@ function navIcon(name) {
     svg.setAttribute('aria-hidden', 'true');
     svg.innerHTML = NAV_ICONS[name] || '';
     return svg;
+}
+
+/* Password input with an accessible show/hide toggle beside it. */
+function passwordField(options = {}) {
+    const input = el('input', { ...options, type: 'password' });
+    const toggle = el('button', {
+        type: 'button',
+        class: 'password-toggle',
+        'aria-label': 'Show password',
+        'aria-pressed': 'false',
+        onclick: () => {
+            const show = input.type === 'password';
+            input.type = show ? 'text' : 'password';
+            toggle.setAttribute('aria-label', show ? 'Hide password' : 'Show password');
+            toggle.setAttribute('aria-pressed', show ? 'true' : 'false');
+            toggle.replaceChildren(navIcon(show ? 'eye-off' : 'eye'));
+        },
+    }, navIcon('eye'));
+    return { input, wrap: el('div', { class: 'password-wrap' }, input, toggle) };
 }
 
 const STATUS_ICONS = {
@@ -424,7 +445,8 @@ function viewLogin(errorText, fieldErrors = {}) {
     app.replaceChildren();
 
     const emailInput = el('input', { type: 'email', name: 'email', required: true, autocomplete: 'username', placeholder: 'you@tcgc.edu.ph' });
-    const passwordInput = el('input', { type: 'password', name: 'password', required: true, autocomplete: 'current-password', placeholder: 'Enter your password' });
+    const password = passwordField({ name: 'password', required: true, autocomplete: 'current-password', placeholder: 'Enter your password' });
+    const passwordInput = password.input;
     const errorSlot = el('div');
 
     const form = el('form', {
@@ -446,7 +468,7 @@ function viewLogin(errorText, fieldErrors = {}) {
         },
     },
         el('label', { text: 'Institutional email' }), emailInput,
-        el('label', { text: 'Password' }), passwordInput,
+        el('label', { text: 'Password' }), password.wrap,
         el('button', { type: 'submit', text: 'Log in' }),
     );
 
@@ -497,9 +519,9 @@ async function viewStudentHome() {
     setChildren(app, el('h1', { text: `Welcome, ${state.user.full_name}` }), flashBox, formCard, listCard);
 }
 
-function requestsTable(items, { trackingHref, staffHref, showStudent = false }) {
+function requestsTable(items, { trackingHref, staffHref, showStudent = false, showCatalogHint = true }) {
     const rows = items.map((r) => {
-        const groupHint = r.catalog_group
+        const groupHint = showCatalogHint && r.catalog_group
             ? el('div', { class: 'catalog-hint', text: catalogGroupLabel(r.catalog_group) })
             : null;
         return el('tr', { class: 'clickable', onclick: () => { location.hash = trackingHref ? trackingHref(r.tracking_number) : staffHref(r.id); } },
@@ -812,13 +834,16 @@ async function renderStaffRequestList({ title, page, pageSize }) {
 
     app.replaceChildren(
         el('h1', { text: title }),
+        state.user.role === 'admin'
+            ? el('p', { class: 'muted', text: 'Administrator view-only: registrar staff handle request status changes and student messages.' })
+            : null,
         el('div', { class: 'card filters' },
             statusField, categoryField, searchField,
             el('button', { class: 'wide', text: 'Apply filters', onclick: applyFilters }),
         ),
         el('div', { class: 'card' },
             el('p', { class: 'muted', text: note }),
-            requestsTable(result.data.items, { staffHref: (id) => `#/staff/request/${id}`, showStudent: true }),
+            requestsTable(result.data.items, { staffHref: (id) => `#/staff/request/${id}`, showStudent: true, showCatalogHint: false }),
             result.data.items.length === 0 ? el('p', { class: 'muted', text: 'No matching requests. Adjust the filters above.' }) : null,
             pagination,
         ),
@@ -839,20 +864,22 @@ async function viewStaffRequest(requestId) {
 
     const { request, history, audit, issuance } = detail.data;
     const actionSlot = el('div');
+    const isAdmin = state.user.role === 'admin';
 
-    // A blocked duplicate may only be rejected by staff while the request is
-    // still rejectable. Administrators keep the audited override path.
+    // Staff manage the workflow. Administrators have read-only oversight of
+    // the queue and detail, so no transition or message actions are rendered.
     const blocked = Boolean(issuance && issuance.blocked);
     const canRejectCurrent = Boolean((NEXT_STATES[request.status] || {}).rejected);
-    const staffOnlyReject = blocked && state.user.role !== 'admin' && canRejectCurrent;
-    const allowedStates = staffOnlyReject
-        ? { rejected: true }
-        : (NEXT_STATES[request.status] || {});
+    const staffOnlyReject = blocked && !isAdmin && canRejectCurrent;
+    const allowedStates = isAdmin
+        ? {}
+        : (staffOnlyReject ? { rejected: true } : (NEXT_STATES[request.status] || {}));
 
     // The rejection reason is already the message to the student. Do not show
     // a second, identically prefilled message form for a staff rejection.
     // Terminal duplicates (released/rejected/cancelled) can still be replied to.
-    const showReplyForm = !staffOnlyReject
+    const showReplyForm = !isAdmin
+        && !staffOnlyReject
         && Boolean(issuance?.student_message || ['released', 'rejected', 'cancelled'].includes(request.status));
 
     const transitionButtons = Object.entries(allowedStates).map(([to, reasonRequired]) =>
@@ -900,8 +927,13 @@ async function viewStaffRequest(requestId) {
             header,
             details,
             issuanceNotice(issuance),
-            el('div', { class: 'actions', style: 'margin-top:1.1rem;' }, transitionButtons),
-            actionSlot,
+            isAdmin
+                ? el('p', { class: 'muted', text: 'Administrator view-only: request status changes and student messages are handled by registrar staff.' })
+                : null,
+            !isAdmin
+                ? el('div', { class: 'actions', style: 'margin-top:1.1rem;' }, transitionButtons)
+                : null,
+            !isAdmin ? actionSlot : null,
             showReplyForm
                 ? issuanceReplyForm(request.id, issuance?.student_message || '')
                 : null,
@@ -913,7 +945,7 @@ async function viewStaffRequest(requestId) {
 
 /*
  * Staff-side issuance check. Blocking rules are enforced by the server; this
- * renders the same decision. The audited override lives in the transition form.
+ * renders the same decision. Staff may only reject a blocked duplicate.
  */
 function issuanceNotice(issuance) {
     if (!issuance || issuance.policy === 'unlimited') return null;
@@ -991,10 +1023,8 @@ function issuanceReplyForm(requestId, defaultMessage) {
 
 function renderTransitionForm(slot, request, toStatus, reasonRequired, issuance) {
     const blockedRejection = Boolean(issuance && issuance.blocked && toStatus === 'rejected');
-    const mayOverride = Boolean(issuance && issuance.blocked && toStatus !== 'rejected' && state.user.role === 'admin');
-    const reasonNeeded = reasonRequired || mayOverride || blockedRejection;
+    const reasonNeeded = reasonRequired || blockedRejection;
     const defaultRemark = blockedRejection ? (issuance.student_message || issuance.message || '') : '';
-    const overrideCheckbox = el('input', { type: 'checkbox', style: 'width:auto;' });
     const remarkInput = el('textarea', {
         rows: '2',
         maxlength: '500',
@@ -1014,7 +1044,6 @@ function renderTransitionForm(slot, request, toStatus, reasonRequired, issuance)
                         to: toStatus,
                         remark: remarkInput.value.trim(),
                         version: request.version,
-                        override_issuance: mayOverride && overrideCheckbox.checked,
                     },
                 });
                 route();
@@ -1024,12 +1053,6 @@ function renderTransitionForm(slot, request, toStatus, reasonRequired, issuance)
             }
         },
     });
-
-    const overrideField = mayOverride
-        ? el('label', { class: 'form-warning' },
-            overrideCheckbox,
-            ' Override the issuance limit for this request (administrator only; reason of at least 10 characters required)')
-        : null;
 
     const reasonLabel = blockedRejection
         ? 'Reason for rejection (required)'
@@ -1041,7 +1064,6 @@ function renderTransitionForm(slot, request, toStatus, reasonRequired, issuance)
         el('form', { onsubmit: (e) => { e.preventDefault(); submit.click(); } },
             el('label', { text: reasonLabel }),
             remarkInput,
-            overrideField,
             submit,
         ),
     ));
@@ -1189,21 +1211,60 @@ async function viewAdminUsers(formState = {}) {
     const app = document.getElementById('app');
     app.replaceChildren(el('p', { class: 'muted', text: 'Loading…' }));
 
+    const includeDisabled = Boolean(formState.includeDisabled);
     let result;
     try {
-        result = await api('/api/v1/admin/users?page=1&page_size=50');
+        result = await api(`/api/v1/admin/users?page=1&page_size=50${includeDisabled ? '&include_disabled=1' : ''}`);
     } catch (err) {
         app.replaceChildren(messageBox('form-error', err.message));
         return;
     }
 
-    const rows = result.data.items.map((u) => el('tr', {},
-        el('td', { 'data-label': 'Name', text: u.full_name }),
-        el('td', { 'data-label': 'Email', text: u.email }),
-        el('td', { 'data-label': 'Role', text: u.role }),
-        el('td', { 'data-label': 'Status' }, statusBadge(u.status === 'active' ? 'released' : 'cancelled'), ` ${u.status}`),
-        el('td', { 'data-label': 'Student no.', text: u.student_number || '—' }),
-    ));
+    const flashBox = flash ? messageBox(flash.kind, flash.text) : null;
+    flash = null;
+    const accountsErrorSlot = el('div');
+
+    const deleteAccount = async (u) => {
+        if (!window.confirm(`Delete ${u.full_name}? This disables the account and preserves its request history.`)) return;
+        accountsErrorSlot.replaceChildren();
+        try {
+            await api(`/api/v1/admin/users/${u.id}`, { method: 'DELETE' });
+            flash = { kind: 'form-success', text: `${u.full_name} was deleted (login disabled).` };
+            viewAdminUsers({ includeDisabled });
+        } catch (err) {
+            accountsErrorSlot.replaceChildren(messageBox('form-error', err.message));
+        }
+    };
+
+    const restoreAccount = async (u) => {
+        if (!window.confirm(`Restore ${u.full_name} and allow login again?`)) return;
+        accountsErrorSlot.replaceChildren();
+        try {
+            await api(`/api/v1/admin/users/${u.id}`, { method: 'PATCH', body: { status: 'active' } });
+            flash = { kind: 'form-success', text: `${u.full_name} was restored.` };
+            viewAdminUsers({ includeDisabled });
+        } catch (err) {
+            accountsErrorSlot.replaceChildren(messageBox('form-error', err.message));
+        }
+    };
+
+    const rows = result.data.items.map((u) => {
+        const isSelf = Number(u.id) === Number(state.user.id);
+        const action = u.status === 'active'
+            ? (isSelf
+                ? el('span', { class: 'muted', text: 'Current account' })
+                : el('button', { class: 'danger', text: 'Delete', onclick: () => deleteAccount(u) }))
+            : el('button', { class: 'secondary', text: 'Restore', onclick: () => restoreAccount(u) });
+
+        return el('tr', {},
+            el('td', { 'data-label': 'Name', text: u.full_name }),
+            el('td', { 'data-label': 'Email', text: u.email }),
+            el('td', { 'data-label': 'Role', text: u.role }),
+            el('td', { 'data-label': 'Status' }, statusBadge(u.status === 'active' ? 'released' : 'cancelled'), ` ${u.status}`),
+            el('td', { 'data-label': 'Student no.', text: u.student_number || '—' }),
+            el('td', { 'data-label': 'Actions' }, action),
+        );
+    });
 
     const errorSlot = el('div');
     const emailInput = el('input', { type: 'email', required: true, placeholder: 'new.user@tcgc.edu.ph', value: formState.email || '' });
@@ -1213,28 +1274,38 @@ async function viewAdminUsers(formState = {}) {
         el('option', { value: 'staff', text: 'Registrar Staff' }),
         el('option', { value: 'admin', text: 'Administrator' }),
     );
-    const studentNoInput = el('input', { type: 'text', placeholder: 'Student number (students only)' });
-    const passwordInput = el('input', { type: 'password', required: true, placeholder: 'Initial password (min 8 chars)' });
-    roleSelect.addEventListener('change', () => {
-        studentNoInput.required = roleSelect.value === 'student';
+    const studentNumberHint = el('p', {
+        class: 'muted',
+        text: 'Student number is generated automatically (YYYY-#####).',
     });
+    roleSelect.addEventListener('change', () => {
+        studentNumberHint.hidden = roleSelect.value !== 'student';
+    });
+    const password = passwordField({ required: true, placeholder: 'Initial password (min 8 chars)' });
+    const passwordInput = password.input;
 
     const createForm = el('form', {
         onsubmit: async (event) => {
             event.preventDefault();
             errorSlot.replaceChildren();
             try {
-                await api('/api/v1/admin/users', {
+                const created = await api('/api/v1/admin/users', {
                     method: 'POST',
                     body: {
                         email: emailInput.value.trim(),
                         full_name: nameInput.value.trim(),
                         role: roleSelect.value,
-                        student_number: studentNoInput.value.trim() || undefined,
                         password: passwordInput.value,
                     },
                 });
-                viewAdminUsers();
+                const user = created.data.user;
+                flash = {
+                    kind: 'form-success',
+                    text: user.student_number
+                        ? `Account created. Student number: ${user.student_number}.`
+                        : 'Account created.',
+                };
+                viewAdminUsers({ includeDisabled });
             } catch (err) {
                 setChildren(
                     errorSlot,
@@ -1247,20 +1318,28 @@ async function viewAdminUsers(formState = {}) {
         el('label', { text: 'Email' }), emailInput,
         el('label', { text: 'Full name' }), nameInput,
         el('label', { text: 'Role' }), roleSelect,
-        el('label', { text: 'Student number' }), studentNoInput,
-        el('label', { text: 'Initial password' }), passwordInput,
+        studentNumberHint,
+        el('label', { text: 'Initial password' }), password.wrap,
         el('button', { type: 'submit', text: 'Create account' }),
     );
 
-    app.replaceChildren(
+    const showDisabledInput = el('input', { type: 'checkbox', style: 'width:auto;', checked: includeDisabled });
+    showDisabledInput.addEventListener('change', () => {
+        viewAdminUsers({ includeDisabled: showDisabledInput.checked });
+    });
+
+    setChildren(app,
         el('h1', { text: 'User management' }),
+        flashBox,
         el('div', { class: 'card' }, el('h2', { text: 'Create account' }), errorSlot, createForm),
         el('div', { class: 'card' },
             el('h2', { text: `Accounts (${result.data.meta.total})` }),
+            el('label', { class: 'checkbox-row' }, showDisabledInput, ' Show disabled accounts'),
+            accountsErrorSlot,
             el('div', { class: 'table-wrap' }, el('table', {},
                 el('thead', {}, el('tr', {},
                     el('th', { text: 'Name' }), el('th', { text: 'Email' }), el('th', { text: 'Role' }),
-                    el('th', { text: 'Status' }), el('th', { text: 'Student no.' }))),
+                    el('th', { text: 'Status' }), el('th', { text: 'Student no.' }), el('th', { text: 'Actions' }))),
                 el('tbody', {}, rows)),
             ),
         ),
@@ -1395,6 +1474,23 @@ async function viewAdminSettings() {
                 }
             },
         });
+        const isCore = Number(type.id) <= 5;
+        const deleteButton = el('button', {
+            class: 'danger',
+            text: 'Delete',
+            disabled: isCore,
+            title: isCore ? 'Core catalogue items cannot be deleted; deactivate them instead.' : 'Delete this catalogue item',
+            onclick: async () => {
+                if (!window.confirm(`Delete "${type.name}"? This cannot be undone. If it has request history, deactivate it instead.`)) return;
+                errorSlot.replaceChildren();
+                try {
+                    await api(`/api/v1/admin/document-types/${type.id}`, { method: 'DELETE' });
+                    viewAdminSettings();
+                } catch (err) {
+                    errorSlot.replaceChildren(messageBox('form-error', err.message));
+                }
+            },
+        });
 
         return el('tr', {},
             el('td', { 'data-label': 'Request' }, nameInput),
@@ -1402,7 +1498,7 @@ async function viewAdminSettings() {
             el('td', { 'data-label': 'Type' }, itemTypeSelect),
             el('td', { 'data-label': 'Policy' }, policySelect),
             el('td', { 'data-label': 'Active' }, activeInput),
-            el('td', { 'data-label': 'Action' }, saveButton),
+            el('td', { 'data-label': 'Actions' }, el('div', { class: 'actions' }, saveButton, deleteButton)),
         );
     });
 
@@ -1468,12 +1564,12 @@ async function viewAdminSettings() {
         ),
         el('div', { class: 'card' },
             el('h2', { text: 'Document catalogue & issuance policies' }),
-            el('p', { class: 'muted', text: 'Groups drive the student request picker. Policies are enforced on every staff transition; blocked duplicates can only be rejected, and administrator overrides require a written reason and are audited.' }),
+            el('p', { class: 'muted', text: 'Groups drive the student request picker. Policies are enforced on every staff transition; blocked duplicates can only be rejected. Core catalogue items (IDs 1–5) can only be deactivated; unused custom items can be deleted.' }),
             el('div', { class: 'table-wrap' }, el('table', { class: 'catalog-table' },
                 el('thead', {}, el('tr', {},
                     el('th', { text: 'Request' }), el('th', { text: 'Group' }),
                     el('th', { text: 'Type' }), el('th', { text: 'Policy' }),
-                    el('th', { text: 'Active' }), el('th', { text: 'Action' }))),
+                    el('th', { text: 'Active' }), el('th', { text: 'Actions' }))),
                 el('tbody', {}, catalogRows),
             )),
         ),
@@ -1557,8 +1653,7 @@ function renderSummary(summary) {
         el('td', { 'data-label': 'Count', text: String(row.count) }),
     ));
 
-    const typeRows = summary.by_document_type.map((row, i) => el('tr', {},
-        el('td', { 'data-label': '#', text: String(135456 + i) }),
+    const typeRows = summary.by_document_type.map((row) => el('tr', {},
         el('td', { 'data-label': 'Type', text: row.document_type_name }),
         el('td', { 'data-label': 'Total', text: String(row.total) }),
         el('td', { 'data-label': 'Released' }, el('span', { class: 'badge-status st-released', text: String(row.released) })),
@@ -1602,7 +1697,7 @@ function renderSummary(summary) {
             el('h2', { text: 'By document type', style: 'margin:0 0 0.6rem 0.4rem;' }),
             el('table', { class: 'soft-table' },
                 el('thead', {}, el('tr', {},
-                    el('th', { text: '#' }), el('th', { text: 'Type' }), el('th', { text: 'Total' }),
+                    el('th', { text: 'Type' }), el('th', { text: 'Total' }),
                     el('th', { text: 'Released' }), el('th', { text: 'Pending' }), el('th', { text: 'Rejected' }))),
                 el('tbody', {}, typeRows),
             ),

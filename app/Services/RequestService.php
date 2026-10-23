@@ -323,13 +323,11 @@ final class RequestService
     }
 
     /**
-     * Staff/admin status transition (FR3/FR4/FR5 together): state-machine
-     * validated, optimistic-concurrency guarded, and written atomically with
-     * history + audit + student notification.
+     * Staff status transition (FR3/FR4/FR5 together): state-machine validated,
+     * optimistic-concurrency guarded, and written atomically with history +
+     * audit + student notification. Administrators have read-only oversight.
      *
-     * @param array $actor session user (staff or admin)
-     * @param bool $overrideIssuance administrator confirmation that a blocked
-     *        issuance-policy rule is intentionally overridden (reason required)
+     * @param array $actor session user (staff)
      * @return array{ok:bool, data?:array, status?:int, code?:string, message?:string, fields?:array}
      */
     public static function transition(
@@ -337,8 +335,7 @@ final class RequestService
         int $requestId,
         string $toStatus,
         ?string $remark,
-        int $version,
-        bool $overrideIssuance = false
+        int $version
     ): array {
         $repository = new RequestRepository();
         $request = $repository->findById($requestId);
@@ -386,7 +383,6 @@ final class RequestService
 
         $db = AppContext::instance()->db();
         $issuance = null;
-        $overrideApplied = false;
         try {
             $db->beginTransaction();
 
@@ -399,39 +395,14 @@ final class RequestService
                 $issuance = IssuancePolicyService::evaluate($request, $requestId);
 
                 if (!empty($issuance['blocked'])) {
-                    if (!$overrideIssuance) {
-                        $db->rollBack();
-                        return [
-                            'ok' => false,
-                            'status' => 409,
-                            'code' => 'issuance_policy_violation',
-                            'message' => (string) $issuance['message']
-                                . ' Staff can only reject this duplicate; an administrator may override with a written reason.',
-                        ];
-                    }
-                    if ($role !== 'admin') {
-                        $db->rollBack();
-                        return [
-                            'ok' => false,
-                            'status' => 403,
-                            'code' => 'forbidden',
-                            'message' => 'Only an administrator can override an issuance-policy block.',
-                        ];
-                    }
-                    if (mb_strlen($remarkTrimmed) < 10) {
-                        $db->rollBack();
-                        return [
-                            'ok' => false,
-                            'status' => 422,
-                            'code' => 'validation_failed',
-                            'message' => 'Please correct the highlighted fields.',
-                            'fields' => [
-                                'remark' => 'An override requires a reason of at least 10 characters.',
-                            ],
-                        ];
-                    }
-                    $historyRemark = 'Issuance policy override: ' . $remarkTrimmed;
-                    $overrideApplied = true;
+                    $db->rollBack();
+                    return [
+                        'ok' => false,
+                        'status' => 409,
+                        'code' => 'issuance_policy_violation',
+                        'message' => (string) $issuance['message']
+                            . ' This duplicate can only be rejected by registrar staff.',
+                    ];
                 }
             }
 
@@ -458,20 +429,6 @@ final class RequestService
 
             AuditService::record('status.changed', 'request', $requestId, ['status' => $fromStatus], ['status' => $toStatus]);
 
-            if ($overrideApplied) {
-                AuditService::record(
-                    'request.issuance_override',
-                    'request',
-                    $requestId,
-                    [
-                        'policy' => $issuance['policy'],
-                        'prior_tracking' => $issuance['prior']['tracking_number'] ?? null,
-                        'prior_status' => $issuance['prior']['status'] ?? null,
-                    ],
-                    ['override' => true, 'reason' => $remarkTrimmed]
-                );
-            }
-
             NotificationService::notifyUser(
                 $requestId,
                 (int) $request['student_id'],
@@ -496,7 +453,7 @@ final class RequestService
     }
 
     /**
-     * Staff/admin reply to the student without changing the workflow status.
+     * Staff reply to the student without changing the workflow status.
      * Used for issuance-policy conversations ("you already received this
      * document") where no transition is possible (e.g. an already released
      * request). The message becomes the request's latest remark and is queued
@@ -561,8 +518,8 @@ final class RequestService
     }
 
     /**
-     * Staff/admin request detail: full processing history (FR3) plus the
-     * append-only audit trail view (FR5).
+     * Staff request detail with read-only administrator access: full processing
+     * history (FR3) plus the append-only audit trail view (FR5).
      *
      * @return array{ok:bool, data?:array, status?:int, code?:string, message?:string}
      */

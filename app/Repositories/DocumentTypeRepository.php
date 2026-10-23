@@ -157,4 +157,22 @@ final class DocumentTypeRepository
 
         return $statement->rowCount();
     }
+
+    /** Number of requests that reference a catalogue item (delete guard). */
+    public function countRequests(int $id): int
+    {
+        $statement = $this->db->prepare('SELECT COUNT(*) FROM requests WHERE document_type_id = ?');
+        $statement->execute([$id]);
+
+        return (int) $statement->fetchColumn();
+    }
+
+    /** Hard-delete an unused catalogue item. Callers must check countRequests(). */
+    public function delete(int $id): int
+    {
+        $statement = $this->db->prepare('DELETE FROM document_types WHERE id = ?');
+        $statement->execute([$id]);
+
+        return $statement->rowCount();
+    }
 }

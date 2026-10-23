@@ -53,7 +53,8 @@ final class RequestStateMachine
         // released, rejected, cancelled are terminal: no entries.
     ];
 
-    private const TRANSITION_ROLES = ['staff', 'admin'];
+    /** Only registrar staff may move a request through the workflow. */
+    private const TRANSITION_ROLES = ['staff'];
 
     public static function isValidStatus(string $status): bool
     {

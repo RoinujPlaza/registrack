@@ -2,7 +2,7 @@
 
 > Web-based registrar transaction tracking for **Tangub City Global College — Office of the College Registrar**. Students submit academic document requests and track them in real time; registrar staff process them through a server-enforced workflow. Every action is captured in an **append-only audit trail**.
 
-![PHP](https://img.shields.io/badge/PHP-8.x-777BB4?logo=php&logoColor=white) ![MySQL](https://img.shields.io/badge/MySQL%20%7C%20MariaDB-4479A1?logo=mysql&logoColor=white) ![Vanilla JS](https://img.shields.io/badge/Frontend-Vanilla%20JS%20SPA-F7DF1E?logo=javascript&logoColor=black) 
+![PHP](https://img.shields.io/badge/PHP-8.4-777BB4?logo=php&logoColor=white) ![MySQL](https://img.shields.io/badge/MySQL%20%7C%20MariaDB-4479A1?logo=mysql&logoColor=white) ![Vanilla JS](https://img.shields.io/badge/Frontend-Vanilla%20JS%20SPA-F7DF1E?logo=javascript&logoColor=black)
 
 **Live repo:** `github.com/RoinujPlaza/registrack` • **Spec source:** `Registrack-Jumawan.docx` • **Decisions:** [`DECISIONS.md`](./DECISIONS.md)
 
@@ -13,8 +13,8 @@
 REGIS-TRACK digitizes the TCGC registrar's paper workflow:
 
 * **Students** (`/student`) — request documents and registrar services from a grouped catalogue (TOR variants, certificates, CAV, and registrar forms), track status via a unique **tracking number**, get notified on every state change, cancel while `Pending`.
-* **Registrar Staff / Admin** (`/staff`) — triage a filtered queue, move requests through a **state machine** guarded by the server, leave remarks/reasons, view immutable history + audit trail.
-* **Admin** — manage accounts, configure **catalogue groups/item metadata + academic terms + per-document issuance policies**, generate **summary reports** (JSON/CSV/print), filter by date/status/type/group.
+* **Registrar Staff** (`/staff`) — triage a filtered queue, move requests through a **state machine** guarded by the server, leave remarks/reasons, view immutable history + audit trail.
+* **Admin** — read-only oversight of the request queue and details; manage accounts (create, soft-delete/restore; student numbers are auto-generated), configure **catalogue groups/item metadata + academic terms + per-document issuance policies**, generate **summary reports** (JSON/CSV/print), filter by date/status/type/group.
 * **System** — enforces workflow rules, prevents double-submit (idempotency key), warns on duplicate requests (30-day window) and blocks repeat issuances for once-only/once-per-term documents, queues dual-channel notifications (in-app + best-effort email via cron), and guarantees audit integrity with a least-privilege DB user (`no UPDATE/DELETE` on audit tables).
 
 ### Lifecycle (server-enforced)
@@ -39,12 +39,12 @@ Ready for Release → Released
 | Layer | Technology |
 |-------|------------|
 | Frontend | HTML5, CSS3, **vanilla JavaScript SPA** (no framework) — hash routes `#/login #/student #/staff #/reports #/notifications #/admin/users #/admin/settings` |
-| Backend | **PHP 8.x** — front controller (`public/index.php`) + modular monolith (`App/Core`, `Controllers`, `Services`, `Repositories`) |
+| Backend | **PHP 8.4.27+** — front controller (`public/index.php`) + modular monolith (`App/Core`, `Controllers`, `Services`, `Repositories`) |
 | Database | **MySQL 8 / MariaDB 10.4+** (XAMPP) — PDO prepared statements, append-only audit |
 | Server | Apache (XAMPP prod) or `php -S` built-in server (dev) |
 | Cron | `cron/dispatch_notifications.php` — async email dispatcher with retry/exhaustion |
 | VCS | Git + GitHub |
-| Tests | PowerShell API tests (237 total) |
+| Tests | PowerShell API tests (253 total) |
 
 **Why no framework?** — Mandated by the specification (modular monolith, vanilla SPA).
 
@@ -86,7 +86,7 @@ registrack/
 
 ### Prerequisites
 
-* **Git**, **PHP 8.0+** (`php -v`), **MySQL 8 or MariaDB 10.4+** (via [XAMPP](https://www.apachefriends.org/))
+* **Git**, **PHP 8.4.27+** (`php -v`), **MySQL 8 or MariaDB 10.4+** (via [XAMPP](https://www.apachefriends.org/))
 * Windows PowerShell (or Git Bash)
 
 ### 1. Clone
@@ -188,11 +188,12 @@ active state without deleting historical requests.
 | Honorable Dismissal | Once only | Blocked; staff can only reject a duplicate |
 
 Admins adjust the policy, catalogue metadata, active state, and school-year/semester
-calendar in **Admin → Settings** (`#/admin/settings`). When a request is blocked, staff see
-only the **Rejected** action; the rejection reason is prefilled and appears in that request's
-processing history. An administrator may still override a blocked issuance with a written
-reason of at least 10 characters; the override is recorded as `request.issuance_override` in
-the audit trail. Cancelled/rejected requests do not consume an issuance.
+calendar in **Admin → Settings** (`#/admin/settings`). Administrators have read-only
+oversight of the request queue and request details; only registrar staff can change a
+request's status or message the student. When a request is blocked, staff see only the
+**Rejected** action; the rejection reason is prefilled and appears in that request's
+processing history. There is no administrator override. Cancelled/rejected requests do
+not consume an issuance.
 
 Terminal requests (`Released`, `Rejected`, `Cancelled`) no longer show a duplicate
 warning, so an older released request does not point at a newer request. Requests that
@@ -233,10 +234,10 @@ Base: `/api/v1` — JSON, `X-CSRF-Token` required for non-GET when authenticated
 * `POST /api/v1/auth/login`, `POST /api/v1/auth/logout`, `GET /api/v1/me`
 * `GET /api/v1/document-types`
 * `POST /api/v1/requests` (header `Idempotency-Key`), `GET /api/v1/requests/mine`, `GET /api/v1/requests/mine/{tracking}`, `POST /api/v1/requests/mine/{tracking}/cancel`
-* `GET /api/v1/staff/requests?active_only=1&q=&status=&document_type_id=&catalog_group=&date_from=&date_to=&page=&page_size=`, `GET /api/v1/requests/{id}`, `POST /api/v1/requests/{id}/transition` (body `to`, `remark`, `version` — concurrency guard; optional `override_issuance` for administrators, with a written reason), `POST /api/v1/requests/{id}/message` (staff reply without a status change)
+* `GET /api/v1/staff/requests?active_only=1&q=&status=&document_type_id=&catalog_group=&date_from=&date_to=&page=&page_size=`, `GET /api/v1/requests/{id}` (staff and read-only admin), `POST /api/v1/requests/{id}/transition` (staff only; body `to`, `remark`, `version` — concurrency guard), `POST /api/v1/requests/{id}/message` (staff reply without a status change)
 * `GET /api/v1/notifications`, `POST /api/v1/notifications/{id}/read`, `POST /api/v1/notifications/read-all`
-* `GET /api/v1/admin/reports/summary?from=&to=&status=&format=csv`, `GET /api/v1/admin/users`, `POST /api/v1/admin/users`
-* `GET /api/v1/admin/settings`, `POST /api/v1/admin/terms`, `PATCH /api/v1/admin/terms/{id}`, `POST /api/v1/admin/document-types`, `PATCH /api/v1/admin/document-types/{id}`
+* `GET /api/v1/admin/reports/summary?from=&to=&status=&format=csv`, `GET /api/v1/admin/users?include_disabled=`, `POST /api/v1/admin/users`, `PATCH /api/v1/admin/users/{id}`, `DELETE /api/v1/admin/users/{id}` (soft delete)
+* `GET /api/v1/admin/settings`, `POST /api/v1/admin/terms`, `PATCH /api/v1/admin/terms/{id}`, `POST /api/v1/admin/document-types`, `PATCH /api/v1/admin/document-types/{id}`, `DELETE /api/v1/admin/document-types/{id}` (unused custom items only)
 * `GET /health`
 
 ---

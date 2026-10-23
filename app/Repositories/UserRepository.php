@@ -54,6 +54,33 @@ final class UserRepository
     }
 
     /**
+     * Next generated student number for a calendar year (YYYY-#####).
+     * The caller retries on a unique-key race if two admins create at once.
+     */
+    public function nextStudentNumber(string $year): string
+    {
+        $prefix = $year . '-';
+        $statement = $this->db->prepare(
+            'SELECT student_number FROM users
+             WHERE student_number LIKE ?
+             ORDER BY student_number DESC
+             LIMIT 1'
+        );
+        $statement->execute([$prefix . '%']);
+        $last = $statement->fetchColumn();
+
+        $next = 1;
+        if ($last !== false) {
+            $suffix = substr((string) $last, strlen($prefix));
+            if ($suffix !== '' && ctype_digit($suffix)) {
+                $next = (int) $suffix + 1;
+            }
+        }
+
+        return $prefix . str_pad((string) $next, 5, '0', STR_PAD_LEFT);
+    }
+
+    /**
      * @param array{email:string, password_hash:string, role:string, full_name:string,
      *              student_number:?string, program:?string, status:string} $data
      */
@@ -124,7 +151,7 @@ final class UserRepository
     /**
      * Paginated, filterable user list for the admin console.
      *
-     * @param array{role?:string, q?:string} $filters
+     * @param array{role?:string, q?:string, include_disabled?:bool} $filters
      * @return array{items: array<int, array>, total: int}
      */
     public function listUsers(array $filters, int $page, int $pageSize): array
@@ -132,6 +159,9 @@ final class UserRepository
         $where = [];
         $params = [];
 
+        if (empty($filters['include_disabled'])) {
+            $where[] = "status = 'active'";
+        }
         if (!empty($filters['role'])) {
             $where[] = 'role = ?';
             $params[] = $filters['role'];

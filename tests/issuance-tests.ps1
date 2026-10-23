@@ -1,7 +1,7 @@
 # REGIS-TRACK - Issuance-policy regression suite
 # Covers once-per-semester and once-only documents, the staff-only rejection
-# rule for blocked duplicates, administrator overrides, cancelled requests not
-# consuming an issuance, and the admin settings endpoints for terms and policies.
+# rule for blocked duplicates, cancelled requests not consuming an issuance,
+# and the admin settings endpoints for terms and policies.
 
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot '_api-lib.ps1')
@@ -51,15 +51,15 @@ try {
     }
 
     function Transition-Request {
-        param([int]$Id, [int]$Version, [string]$To, [string]$Remark = '', [bool]$Override = $false)
-        $body = @{ to = $To; version = $Version; remark = $Remark; override_issuance = $Override } | ConvertTo-Json -Compress
+        param([int]$Id, [int]$Version, [string]$To, [string]$Remark = '')
+        $body = @{ to = $To; version = $Version; remark = $Remark } | ConvertTo-Json -Compress
         Invoke-Api -Method 'POST' -Path "/api/v1/requests/$Id/transition" -CookieJar $jarStaff `
             -Headers @{ 'X-CSRF-Token' = $csrfStaff } -Body $body
     }
 
     function Transition-AsAdmin {
-        param([int]$Id, [int]$Version, [string]$To, [string]$Remark = '', [bool]$Override = $false)
-        $body = @{ to = $To; version = $Version; remark = $Remark; override_issuance = $Override } | ConvertTo-Json -Compress
+        param([int]$Id, [int]$Version, [string]$To, [string]$Remark = '')
+        $body = @{ to = $To; version = $Version; remark = $Remark } | ConvertTo-Json -Compress
         Invoke-Api -Method 'POST' -Path "/api/v1/requests/$Id/transition" -CookieJar $jarAdmin `
             -Headers @{ 'X-CSRF-Token' = $csrfAdmin } -Body $body
     }
@@ -122,8 +122,8 @@ try {
     Assert-True 'staff message is audited' ($messageAudit -eq 1) "got $messageAudit"
 
     $staffOverride = Transition-Request -Id $coe2.id -Version $coe2.version -To 'in_process' `
-        -Remark 'Staff attempted to override the duplicate rule' -Override $true
-    Assert-Status 'staff cannot override a blocked issuance (403)' 403 $staffOverride
+        -Remark 'Staff attempted to override the duplicate rule'
+    Assert-Status 'staff cannot override a blocked issuance (409)' 409 $staffOverride
 
     $coe2Process = Transition-Request -Id $coe2.id -Version $coe2.version -To 'in_process'
     Assert-Status 'duplicate COE can only be rejected (409)' 409 $coe2Process
@@ -177,19 +177,15 @@ try {
     Assert-True 'graduation message says only once' ($grad2Issuance.message -match 'only once') "got $($grad2Issuance.message)"
 
     $gradStaffOverride = Transition-Request -Id $grad2.id -Version $grad2.version -To 'in_process' `
-        -Remark 'Staff attempted to override the graduation duplicate' -Override $true
-    Assert-Status 'staff cannot override a graduation duplicate (403)' 403 $gradStaffOverride
+        -Remark 'Staff attempted to override the graduation duplicate'
+    Assert-Status 'staff cannot override a graduation duplicate (409)' 409 $gradStaffOverride
 
     $grad2Process = Transition-Request -Id $grad2.id -Version $grad2.version -To 'in_process'
     Assert-Status 'graduation duplicate can only be rejected (409)' 409 $grad2Process
 
-    $gradOverride = Transition-AsAdmin -Id $grad2.id -Version $grad2.version -To 'in_process' `
-        -Remark 'Administrator approved an exception after verifying the student record' -Override $true
-    Assert-Status 'administrator override with a written reason succeeds (200)' 200 $gradOverride
-    $grad2 = (($gradOverride.Body | ConvertFrom-Json).data).request
-
-    $overrideAudit = [int](Invoke-DbScalar "SELECT COUNT(*) FROM audit_events WHERE action='request.issuance_override' AND request_id=$($grad2.id);")
-    Assert-True 'administrator override is recorded in the audit trail' ($overrideAudit -eq 1) "got $overrideAudit"
+    $gradAdminAttempt = Transition-AsAdmin -Id $grad2.id -Version $grad2.version -To 'in_process' `
+        -Remark 'Administrator attempted to approve an exception after verifying the student record'
+    Assert-Status 'administrator cannot override a blocked issuance (403)' 403 $gradAdminAttempt
 
     $grad2Reject = Transition-Request -Id $grad2.id -Version $grad2.version -To 'rejected' `
         -Remark 'You already received your Certificate of Graduation. This document is issued once only.'
@@ -277,6 +273,23 @@ try {
     Assert-Status 'student reads the active catalogue' 200 $studentTypes
     Assert-True 'deactivated catalogue item is hidden from students' `
         ((@((($studentTypes.Body | ConvertFrom-Json).data).items | Where-Object { $_.id -eq $createdType.id }) | Measure-Object).Count -eq 0)
+
+    # --- Admin catalogue deletion guards ------------------------------------
+    Assert-Status 'core catalogue items cannot be deleted (409)' 409 `
+        (Invoke-Api -Method 'DELETE' -Path '/api/v1/admin/document-types/1' -CookieJar $jarAdmin `
+            -Headers @{ 'X-CSRF-Token' = $csrfAdmin })
+
+    $deleteType = Invoke-Api -Method 'DELETE' -Path "/api/v1/admin/document-types/$($createdType.id)" `
+        -CookieJar $jarAdmin -Headers @{ 'X-CSRF-Token' = $csrfAdmin }
+    Assert-Status 'admin deletes an unused catalogue item (204)' 204 $deleteType
+
+    $settingsAfterDelete = Invoke-Api -Method 'GET' -Path '/api/v1/admin/settings' -CookieJar $jarAdmin
+    Assert-True 'deleted catalogue item is gone from settings' `
+        ((@((($settingsAfterDelete.Body | ConvertFrom-Json).data).document_types | Where-Object { $_.id -eq $createdType.id }) | Measure-Object).Count -eq 0)
+
+    Assert-Status 'staff cannot delete catalogue items (403)' 403 `
+        (Invoke-Api -Method 'DELETE' -Path '/api/v1/admin/document-types/6' -CookieJar $jarStaff `
+            -Headers @{ 'X-CSRF-Token' = $csrfStaff })
 
     $currentTermId = $settings.current_term_id
     $newTerm = Invoke-Api -Method 'POST' -Path '/api/v1/admin/terms' -CookieJar $jarAdmin `

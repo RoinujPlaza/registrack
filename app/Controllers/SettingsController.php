@@ -18,6 +18,9 @@ use RegisTrack\Services\IssuancePolicyService;
  */
 final class SettingsController
 {
+    /** Seeded catalogue items required by the demo and issuance policies. */
+    private const PROTECTED_DOCUMENT_TYPE_IDS = [1, 2, 3, 4, 5];
+
     /** GET /api/v1/admin/settings */
     public static function show(array $params): void
     {
@@ -215,6 +218,41 @@ final class SettingsController
         AuditService::record('document_type.updated', 'document_type', null, $before, self::presentDocumentType($updated));
 
         Http::json(['document_type' => self::presentDocumentType($updated)]);
+    }
+
+    /** DELETE /api/v1/admin/document-types/{id} */
+    public static function deleteDocumentType(array $params): void
+    {
+        Auth::requireRole(['admin']);
+        Csrf::validate();
+
+        $id = (int) $params['id'];
+        $repository = new DocumentTypeRepository();
+        $type = $repository->findById($id);
+        if ($type === null) {
+            Http::error('not_found', 'Document type not found.', 404);
+            return;
+        }
+
+        if (in_array($id, self::PROTECTED_DOCUMENT_TYPE_IDS, true)) {
+            Http::error('conflict', 'Core catalogue items cannot be deleted. Deactivate this item instead.', 409);
+            return;
+        }
+
+        $used = $repository->countRequests($id);
+        if ($used > 0) {
+            Http::error('conflict', sprintf(
+                'This document type is used by %d request(s). Deactivate it instead.',
+                $used
+            ), 409);
+            return;
+        }
+
+        $before = self::presentDocumentType($type);
+        $repository->delete($id);
+        AuditService::record('document_type.deleted', 'document_type', null, $before, null);
+
+        Http::noContent();
     }
 
     /** @param array<string, mixed> $row */

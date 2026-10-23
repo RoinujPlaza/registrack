@@ -72,6 +72,14 @@ try {
     $createdId = ((($created.Body | ConvertFrom-Json).data).user.id)
     if (-not $createdId) { throw 'created user id missing' }
 
+    $autoEmail = "auto$stamp@tcgc.edu.ph"
+    $autoCreated = Invoke-Api -Method 'POST' -Path '/api/v1/admin/users' -CookieJar $jarAdmin `
+        -Headers @{ 'X-CSRF-Token' = $adminCsrf } `
+        -Body ('{"email":"' + $autoEmail + '","password":"AutoPass123","role":"student","full_name":"Auto Number"}')
+    Assert-Status 'admin creates a student with an auto-generated number (201)' 201 $autoCreated
+    $autoNumber = ((($autoCreated.Body | ConvertFrom-Json).data).user.student_number)
+    Assert-True 'auto student number uses YYYY-#####' ($autoNumber -match '^\d{4}-\d{5}$') "got $autoNumber"
+
     $dup = Invoke-Api -Method 'POST' -Path '/api/v1/admin/users' -CookieJar $jarAdmin `
         -Headers @{ 'X-CSRF-Token' = $adminCsrf } `
         -Body ('{"email":"' + $newEmail + '","password":"Password123!","role":"student","full_name":"Dup","student_number":"' + $stamp + 'x"}')
@@ -107,6 +115,38 @@ try {
     $selfDisable = Invoke-Api -Method 'PATCH' -Path '/api/v1/admin/users/1' -CookieJar $jarAdmin `
         -Headers @{ 'X-CSRF-Token' = $adminCsrf } -Body '{"status":"disabled"}'
     Assert-Status 'admin cannot disable own account (409)' 409 $selfDisable
+
+    # --- Soft delete + restore -----------------------------------------------------------
+    $deleteEmail = "deleteme$stamp@tcgc.edu.ph"
+    $deleteCreated = Invoke-Api -Method 'POST' -Path '/api/v1/admin/users' -CookieJar $jarAdmin `
+        -Headers @{ 'X-CSRF-Token' = $adminCsrf } `
+        -Body ('{"email":"' + $deleteEmail + '","password":"DeletePass1","role":"student","full_name":"Delete Target"}')
+    Assert-Status 'admin creates an account for deletion (201)' 201 $deleteCreated
+    $deleteId = ((($deleteCreated.Body | ConvertFrom-Json).data).user.id)
+
+    $deleteResponse = Invoke-Api -Method 'DELETE' -Path "/api/v1/admin/users/$deleteId" -CookieJar $jarAdmin `
+        -Headers @{ 'X-CSRF-Token' = $adminCsrf }
+    Assert-Status 'admin soft-deletes an account (200)' 200 $deleteResponse
+
+    $activeList = Invoke-Api -Method 'GET' -Path '/api/v1/admin/users?page_size=50' -CookieJar $jarAdmin
+    Assert-True 'deleted account is hidden from the default list' `
+        ((@((($activeList.Body | ConvertFrom-Json).data).items | Where-Object { $_.id -eq $deleteId }) | Measure-Object).Count -eq 0)
+
+    $allList = Invoke-Api -Method 'GET' -Path '/api/v1/admin/users?page_size=50&include_disabled=1' -CookieJar $jarAdmin
+    Assert-True 'deleted account appears when disabled accounts are shown' `
+        ((@((($allList.Body | ConvertFrom-Json).data).items | Where-Object { $_.id -eq $deleteId }) | Measure-Object).Count -eq 1)
+
+    $restore = Invoke-Api -Method 'PATCH' -Path "/api/v1/admin/users/$deleteId" -CookieJar $jarAdmin `
+        -Headers @{ 'X-CSRF-Token' = $adminCsrf } -Body '{"status":"active"}'
+    Assert-Status 'admin restores a deleted account (200)' 200 $restore
+
+    $restoredLogin = Invoke-Api -Method 'POST' -Path '/api/v1/auth/login' `
+        -Body ('{"email":"' + $deleteEmail + '","password":"DeletePass1"}')
+    Assert-Status 'restored account can log in (200)' 200 $restoredLogin
+
+    Assert-Status 'admin cannot delete own account (409)' 409 `
+        (Invoke-Api -Method 'DELETE' -Path '/api/v1/admin/users/1' -CookieJar $jarAdmin `
+            -Headers @{ 'X-CSRF-Token' = $adminCsrf })
 
     # --- Password reset round-trip -----------------------------------------------------------
     $student2 = 'student2@tcgc.edu.ph'

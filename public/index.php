@@ -56,6 +56,7 @@ $router->add('POST', '/api/v1/auth/password/reset', [AuthController::class, 'res
 $router->add('GET', '/api/v1/admin/users', [AdminController::class, 'listUsers']);
 $router->add('POST', '/api/v1/admin/users', [AdminController::class, 'createUser']);
 $router->add('PATCH', '/api/v1/admin/users/{id}', [AdminController::class, 'updateUser']);
+$router->add('DELETE', '/api/v1/admin/users/{id}', [AdminController::class, 'deleteUser']);
 
 // Admin settings — academic terms and issuance policies
 $router->add('GET', '/api/v1/admin/settings', [SettingsController::class, 'show']);
@@ -63,6 +64,7 @@ $router->add('POST', '/api/v1/admin/terms', [SettingsController::class, 'createT
 $router->add('PATCH', '/api/v1/admin/terms/{id}', [SettingsController::class, 'updateTerm']);
 $router->add('POST', '/api/v1/admin/document-types', [SettingsController::class, 'createDocumentType']);
 $router->add('PATCH', '/api/v1/admin/document-types/{id}', [SettingsController::class, 'updateDocumentType']);
+$router->add('DELETE', '/api/v1/admin/document-types/{id}', [SettingsController::class, 'deleteDocumentType']);
 
 // Phase 3 — Request submission (FR2)
 $router->add('GET', '/api/v1/document-types', [DocumentTypeController::class, 'list']);
