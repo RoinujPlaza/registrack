@@ -759,9 +759,6 @@ async function renderStaffRequestList({ title, page, pageSize }) {
     for (const [id, key] of [
         ['f-q', 'q'],
         ['f-category', 'catalog_group'],
-        ['f-type', 'document_type_id'],
-        ['f-from', 'date_from'],
-        ['f-to', 'date_to'],
     ]) {
         const value = document.getElementById(id)?.value?.trim();
         if (value) params.set(key, value);
@@ -793,15 +790,9 @@ async function renderStaffRequestList({ title, page, pageSize }) {
             selected: params.get('catalog_group') === group.value,
         })),
     );
-    const typeInput = el('input', { id: 'f-type', type: 'number', min: '1', placeholder: 'Type ID', value: params.get('document_type_id') || '' });
-    const fromInput = el('input', { id: 'f-from', type: 'date', value: params.get('date_from') || '' });
-    const toInput = el('input', { id: 'f-to', type: 'date', value: params.get('date_to') || '' });
     const statusField = el('label', { class: 'filter-field' }, el('span', { class: 'filter-label', text: 'Status' }), statusSelect);
     const categoryField = el('label', { class: 'filter-field' }, el('span', { class: 'filter-label', text: 'Group' }), categorySelect);
     const searchField = el('label', { class: 'filter-field' }, el('span', { class: 'filter-label', text: 'Search' }), searchInput);
-    const typeField = el('label', { class: 'filter-field' }, el('span', { class: 'filter-label', text: 'Type ID' }), typeInput);
-    const fromField = el('label', { class: 'filter-field' }, el('span', { class: 'filter-label', text: 'From' }), fromInput);
-    const toField = el('label', { class: 'filter-field' }, el('span', { class: 'filter-label', text: 'To' }), toInput);
     const applyFilters = () => viewStaffQueue(1);
 
     const meta = result.data.meta;
@@ -822,7 +813,7 @@ async function renderStaffRequestList({ title, page, pageSize }) {
     app.replaceChildren(
         el('h1', { text: title }),
         el('div', { class: 'card filters' },
-            statusField, categoryField, searchField, typeField, fromField, toField,
+            statusField, categoryField, searchField,
             el('button', { class: 'wide', text: 'Apply filters', onclick: applyFilters }),
         ),
         el('div', { class: 'card' },
