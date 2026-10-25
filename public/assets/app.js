@@ -832,7 +832,7 @@ async function renderStaffRequestList({ title, page, pageSize }) {
             (page * meta.page_size) < meta.total ? el('button', { class: 'secondary', text: 'Older →', onclick: () => viewStaffQueue(page + 1) }) : null,
         );
 
-    app.replaceChildren(
+    setChildren(app,
         el('h1', { text: title }),
         state.user.role === 'admin'
             ? el('p', { class: 'muted', text: 'Administrator view-only: registrar staff handle request status changes and student messages.' })
